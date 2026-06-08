@@ -30,10 +30,23 @@ jobs:
 
       - name: Log in to Docker Hub
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+        env:
+          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+          DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Retry with backoff: auth.docker.io occasionally times out.
+          for ATTEMPT in 1 2 3 4 5; do
+            if echo "${DOCKER_HUB_ACCESS_TOKEN}" \
+              | docker login -u "${DOCKER_HUB_USERNAME}" --password-stdin; then
+              echo "Docker Hub login OK (attempt ${ATTEMPT})"
+              exit 0
+            fi
+            echo "Login attempt ${ATTEMPT} failed; retrying in $((ATTEMPT * 10))s..."
+            sleep $((ATTEMPT * 10))
+          done
+          echo "Docker Hub login failed after 5 attempts" >&2
+          exit 1
 
       - name: Extract metadata (base image)
         id: meta
@@ -79,10 +92,23 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+        env:
+          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+          DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Retry with backoff: auth.docker.io occasionally times out.
+          for ATTEMPT in 1 2 3 4 5; do
+            if echo "${DOCKER_HUB_ACCESS_TOKEN}" \
+              | docker login -u "${DOCKER_HUB_USERNAME}" --password-stdin; then
+              echo "Docker Hub login OK (attempt ${ATTEMPT})"
+              exit 0
+            fi
+            echo "Login attempt ${ATTEMPT} failed; retrying in $((ATTEMPT * 10))s..."
+            sleep $((ATTEMPT * 10))
+          done
+          echo "Docker Hub login failed after 5 attempts" >&2
+          exit 1
 
       - name: Extract metadata (mcpo image)
         id: meta
