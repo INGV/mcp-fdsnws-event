@@ -1,7 +1,7 @@
 # Run the FDSNWS Event MCP server behind mcpo, exposed as an OpenAPI endpoint
 # for OpenWebUI.
 #
-#   docker build -t fdsnws-event-server .            # build the base image once
+#   docker build -t mcp-fdsnws-event-server .        # build the base image once
 #   docker compose -f compose.mcpo.yml up -d --build
 #
 # Then in OpenWebUI add a tool/connection pointing at:  http://<host>:8000

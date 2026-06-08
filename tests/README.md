@@ -24,8 +24,8 @@ pytest -m "unit or integration"   # or: pytest -m ''
 Inside Docker (the primary workflow):
 
 ```bash
-docker run --rm fdsnws-event-server pytest                 # unit
-docker run --rm fdsnws-event-server pytest -m integration  # live
+docker run --rm mcp-fdsnws-event-server pytest                 # unit
+docker run --rm mcp-fdsnws-event-server pytest -m integration  # live
 ```
 
 ## Layout

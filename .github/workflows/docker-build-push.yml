@@ -1,0 +1,184 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - main
+
+env:
+  DOCKER_IMAGE: ingv/mcp-fdsnws-event
+
+jobs:
+  build-base:
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Extract metadata (base image)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+          # latest=auto -> the `latest` tag is added only on semver tag builds,
+          # never on plain `main` pushes.
+          flavor: |
+            latest=auto
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+
+      - name: Build and push base image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=base
+          cache-to: type=gha,mode=max,scope=base
+
+  build-mcpo:
+    runs-on: ubuntu-latest
+    needs: build-base
+    # The mcpo image builds FROM the pushed base image, so it only runs when the
+    # base image was actually pushed (not on pull requests).
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Extract metadata (mcpo image)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+          # Same tags as the base image, with a -mcpo suffix (also on `latest`).
+          flavor: |
+            latest=auto
+            suffix=-mcpo,onlatest=true
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+
+      - name: Build and push mcpo image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.mcpo
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            BASE_IMAGE=${{ env.DOCKER_IMAGE }}@${{ needs.build-base.outputs.digest }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=mcpo
+          cache-to: type=gha,mode=max,scope=mcpo
+
+  retention:
+    runs-on: ubuntu-latest
+    needs: [build-base, build-mcpo]
+    # Only prune on version tag builds, after both images are published.
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Keep only the latest 5 semver versions on Docker Hub
+        env:
+          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+          DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
+          KEEP: "5"
+        run: |
+          set -euo pipefail
+
+          # Authenticate to the Docker Hub API (token must have delete scope).
+          TOKEN=$(curl -fsSL -H "Content-Type: application/json" \
+            -X POST \
+            -d "{\"username\":\"${DOCKER_HUB_USERNAME}\",\"password\":\"${DOCKER_HUB_ACCESS_TOKEN}\"}" \
+            https://hub.docker.com/v2/users/login/ | jq -r '.token')
+
+          # Collect every tag in the repository (paginated).
+          ALL_TAGS=""
+          URL="https://hub.docker.com/v2/repositories/${DOCKER_IMAGE}/tags?page_size=100"
+          while [ -n "${URL}" ] && [ "${URL}" != "null" ]; do
+            RESP=$(curl -fsSL -H "Authorization: JWT ${TOKEN}" "${URL}")
+            ALL_TAGS="${ALL_TAGS}"$'\n'"$(echo "${RESP}" | jq -r '.results[].name')"
+            URL=$(echo "${RESP}" | jq -r '.next')
+          done
+
+          # Base semver versions only (X.Y.Z, no -mcpo suffix), oldest first.
+          VERSIONS=$(echo "${ALL_TAGS}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | uniq || true)
+          TOTAL=$(echo "${VERSIONS}" | grep -c . || true)
+          DELETE_COUNT=$(( TOTAL - KEEP ))
+
+          echo "Found ${TOTAL} semver versions; keeping ${KEEP}."
+          if [ "${DELETE_COUNT}" -le 0 ]; then
+            echo "Nothing to prune."
+            exit 0
+          fi
+
+          OLD_VERSIONS=$(echo "${VERSIONS}" | head -n "${DELETE_COUNT}")
+          for VERSION in ${OLD_VERSIONS}; do
+            for TAG in "${VERSION}" "${VERSION}-mcpo"; do
+              # Only delete the tag if it actually exists.
+              if echo "${ALL_TAGS}" | grep -qx "${TAG}"; then
+                echo "Deleting ${DOCKER_IMAGE}:${TAG}"
+                curl -fsSL -X DELETE \
+                  -H "Authorization: JWT ${TOKEN}" \
+                  "https://hub.docker.com/v2/repositories/${DOCKER_IMAGE}/tags/${TAG}/"
+              fi
+            done
+          done
+
+  dockerhub-description:
+    runs-on: ubuntu-latest
+    needs: build-base
+    # Sync the README to the Docker Hub repository page on main pushes only.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          repository: ${{ env.DOCKER_IMAGE }}
+          short-description: "MCP server wrapping the FDSN Web Service Event APIs (multi-datacenter)"
+          readme-filepath: ./README.md

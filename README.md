@@ -1,3 +1,9 @@
+[![Build Status](https://github.com/INGV/mcp-fdsnws-event/actions/workflows/docker-build-push.yml/badge.svg?branch=main)](https://github.com/INGV/mcp-fdsnws-event/actions/workflows/docker-build-push.yml?query=branch%3Amain)
+[![Version](https://img.shields.io/badge/dynamic/yaml?label=ver&query=softwareVersion&url=https://raw.githubusercontent.com/INGV/mcp-fdsnws-event/main/publiccode.yml)](https://github.com/INGV/mcp-fdsnws-event/blob/main/publiccode.yml)
+[![Docker Pulls](https://img.shields.io/docker/pulls/ingv/mcp-fdsnws-event)](https://hub.docker.com/r/ingv/mcp-fdsnws-event)
+[![License](https://img.shields.io/github/license/INGV/mcp-fdsnws-event.svg)](https://github.com/INGV/mcp-fdsnws-event/blob/main/LICENSE)
+[![GitHub issues](https://img.shields.io/github/issues/INGV/mcp-fdsnws-event.svg)](https://github.com/INGV/mcp-fdsnws-event/issues)
+
 # FDSNWS Event MCP Server
 
 An MCP (Model Context Protocol) server for querying the FDSN Web Service Event APIs of
@@ -20,11 +26,27 @@ earthquake information as JSON.
 - Docker
 - Python 3.11+ (for local development)
 
-### Build the container
+### Option A: Pull from Docker Hub (recommended)
+
+Prebuilt multi-arch images (linux/amd64, linux/arm64) are published on Docker Hub:
+
+```bash
+# Latest release
+docker pull ingv/mcp-fdsnws-event
+
+# A specific version
+docker pull ingv/mcp-fdsnws-event:1.0.0
+```
+
+> An `mcpo` variant (OpenAPI/REST wrapper, see below) is published under the same
+> repository with a `-mcpo` suffix, e.g. `ingv/mcp-fdsnws-event:1.0.0-mcpo` and
+> `ingv/mcp-fdsnws-event:latest-mcpo`.
+
+### Option B: Build the container locally
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/INGV/mcp-fdsnws-event.git
 cd mcp-fdsnws-event
 
 # Build the Docker image
@@ -247,7 +269,7 @@ directly (no docker-in-docker, no Docker socket mount): see `Dockerfile.mcpo` an
 
 ```bash
 # Build the base image once
-docker build -t fdsnws-event-server .
+docker build -t mcp-fdsnws-event-server .
 
 # Start mcpo (builds the wrapper image and exposes it on :8000)
 docker compose -f compose.mcpo.yml up -d --build
@@ -256,7 +278,7 @@ docker compose -f compose.mcpo.yml up -d --build
 Equivalent without compose:
 
 ```bash
-docker build -t fdsnws-event-server .
+docker build -t mcp-fdsnws-event-server .
 docker build -f Dockerfile.mcpo -t fdsnws-event-mcpo .
 docker run -d -p 8000:8000 --name fdsnws-mcpo fdsnws-event-mcpo
 ```
@@ -284,17 +306,26 @@ In OpenWebUI go to **Settings → Tools** (or **Admin → Settings → Tools**) 
 
 ## License
 
-This project is released under the MIT license.
+This project is released under the **GNU Affero General Public License v3.0 or
+later** (AGPL-3.0-or-later). See the [`LICENSE`](LICENSE) file for the full text.
+
+## Authors
+
+See [`AUTHORS.md`](AUTHORS.md).
 
 ## Contributing
 
 Contributions are welcome! Please:
 
 1. Fork the repository
-2. Create a branch for your feature
-3. Commit your changes
-4. Open a Pull Request
+2. Create a feature branch off `main`
+3. Commit your changes (see [Conventional Commits](https://www.conventionalcommits.org/))
+4. Open a Pull Request against `main`
+
+By contributing you agree that your contributions are licensed under the
+AGPL-3.0-or-later license of this project.
 
 ## Support
 
-For problems or questions, open an issue in the GitHub repository.
+For problems or questions, open an issue in the
+[GitHub repository](https://github.com/INGV/mcp-fdsnws-event/issues).

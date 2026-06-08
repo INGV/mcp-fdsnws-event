@@ -1,0 +1,54 @@
+# This repository adheres to the publiccode.yml standard by including this
+# metadata file that makes public software easily discoverable.
+# More info at https://github.com/publiccodeyml/publiccode.yml
+
+publiccodeYmlVersion: "0"
+name: "INGV - FDSNWS Event MCP Server"
+releaseDate: 2026-06-08
+url: "https://github.com/INGV/mcp-fdsnws-event"
+landingURL: "https://github.com/INGV/mcp-fdsnws-event"
+softwareVersion: v1.0.0
+developmentStatus: stable
+softwareType: standalone/backend
+platforms:
+  - windows
+  - mac
+  - linux
+usedBy:
+  - INGV
+categories:
+  - data-analytics
+  - data-visualization
+maintenance:
+  type: internal
+  contacts:
+    - name: Valentino Lauciani
+      email: valentino.lauciani@ingv.it
+legal:
+  license: "AGPL-3.0-or-later"
+intendedAudience:
+  scope:
+    - research
+localisation:
+  localisationReady: false
+  availableLanguages:
+    - en
+organisation:
+  name: "Istituto Nazionale di Geofisica e Vulcanologia - INGV"
+  uri: "urn:x-italian-pa:ingv"
+description:
+  en:
+    shortDescription: >-
+      MCP server wrapping the FDSN Web Service Event APIs of multiple
+      seismological datacenters.
+    documentation: "https://github.com/INGV/mcp-fdsnws-event/blob/main/README.md"
+    longDescription: >
+      An MCP (Model Context Protocol) server that wraps the FDSN Web Service Event APIs of multiple seismological datacenters (INGV, IRIS, EMSC, GFZ, and other FDSN-compliant services) and provides earthquake data as JSON to MCP clients such as Claude Desktop.
+
+      The server communicates over stdio (JSON-RPC 2.0) and uses ObsPy to query any FDSN-compliant datacenter. It exposes six tools: event search (compact tabular output), single-event detail, arrivals, magnitudes, origins, and focal mechanisms. An optional mcpo wrapper exposes the same tools as an OpenAPI/REST endpoint for OpenWebUI.
+    localisedName: "FDSNWS Event MCP Server"
+    features:
+      - FDSN Web Service Event query
+      - Multi-datacenter earthquake data access
+      - QuakeML to JSON serialization
+      - Model Context Protocol (MCP) server

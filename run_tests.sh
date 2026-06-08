@@ -10,7 +10,7 @@ if [[ "${1:-}" == "--integration" ]]; then
     RUN_INTEGRATION=1
 fi
 
-IMAGE="fdsnws-event-server"
+IMAGE="mcp-fdsnws-event-server"
 
 echo "FDSNWS Event MCP Server - Test Suite"
 echo "===================================="
