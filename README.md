@@ -58,8 +58,11 @@ docker build --no-cache -t mcp-fdsnws-event-server .
 ### Start the MCP server
 
 ```bash
-# Start the MCP server
-docker run -i mcp-fdsnws-event-server
+# Pull the published image (first run only)
+docker pull ingv/mcp-fdsnws-event
+
+# Start the MCP server (stdio)
+docker run -i --rm ingv/mcp-fdsnws-event
 ```
 
 The server listens for MCP connections over stdio.
@@ -189,7 +192,7 @@ configuration:
   "mcpServers": {
     "fdsnws-event": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "mcp-fdsnws-event-server"]
+      "args": ["run", "-i", "--rm", "ingv/mcp-fdsnws-event"]
     }
   }
 }
@@ -267,20 +270,18 @@ directly (no docker-in-docker, no Docker socket mount): see `Dockerfile.mcpo` an
 
 ### Run
 
-```bash
-# Build the base image once
-docker build -t mcp-fdsnws-event-server .
+Pull and run the published `mcpo` image (recommended):
 
-# Start mcpo (builds the wrapper image and exposes it on :8000)
-docker compose -f compose.mcpo.yml up -d --build
+```bash
+docker pull ingv/mcp-fdsnws-event:latest-mcpo
+docker run -d -p 8000:8000 --name fdsnws-mcpo ingv/mcp-fdsnws-event:latest-mcpo
 ```
 
-Equivalent without compose:
+Or build it locally (for development):
 
 ```bash
-docker build -t mcp-fdsnws-event-server .
-docker build -f Dockerfile.mcpo -t fdsnws-event-mcpo .
-docker run -d -p 8000:8000 --name fdsnws-mcpo fdsnws-event-mcpo
+docker build -t mcp-fdsnws-event-server .            # base image
+docker compose -f compose.mcpo.yml up -d --build     # mcpo wrapper on :8000
 ```
 
 This exposes:
