@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  fdsnws-event-server:
+    build: .
+    container_name: fdsnws-event-mcp-server
+    stdin_open: true
+    tty: true
+    networks:
+      - mcp-network
+
+networks:
+  mcp-network:
+    driver: bridge

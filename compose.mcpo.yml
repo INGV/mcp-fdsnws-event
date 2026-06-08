@@ -1,0 +1,24 @@
+# Run the FDSNWS Event MCP server behind mcpo, exposed as an OpenAPI endpoint
+# for OpenWebUI.
+#
+#   docker build -t fdsnws-event-server .            # build the base image once
+#   docker compose -f compose.mcpo.yml up -d --build
+#
+# Then in OpenWebUI add a tool/connection pointing at:  http://<host>:8000
+# OpenAPI spec:  http://<host>:8000/openapi.json   ·   Docs UI:  http://<host>:8000/docs
+services:
+  fdsnws-mcpo:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcpo
+    image: fdsnws-event-mcpo
+    container_name: fdsnws-event-mcpo
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    # Optional: protect the endpoint with an API key (then set the same key in OpenWebUI).
+    # command: ["mcpo", "--host", "0.0.0.0", "--port", "8000", "--api-key", "change-me",
+    #           "--", "python", "-m", "fdsnws_event_server.server"]
+    # Optional: tune the upstream FDSN request timeout (seconds).
+    # environment:
+    #   - FDSN_TIMEOUT=45
