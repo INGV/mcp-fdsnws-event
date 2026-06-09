@@ -32,15 +32,15 @@ Prebuilt multi-arch images (linux/amd64, linux/arm64) are published on Docker Hu
 
 ```bash
 # Latest release
-docker pull ingv/mcp-fdsnws-event
+docker pull ingv/mcp-fdsnws-event:latest
 
-# A specific version
-docker pull ingv/mcp-fdsnws-event:1.2.0
+# A specific version (replace X.Y.Z with a published tag)
+docker pull ingv/mcp-fdsnws-event:X.Y.Z
 ```
 
 > An `mcpo` variant (OpenAPI/REST wrapper, see below) is published under the same
-> repository with a `-mcpo` suffix, e.g. `ingv/mcp-fdsnws-event:1.2.0-mcpo` and
-> `ingv/mcp-fdsnws-event:latest-mcpo`.
+> repository with a `-mcpo` suffix, e.g. `ingv/mcp-fdsnws-event:latest-mcpo` and
+> `ingv/mcp-fdsnws-event:X.Y.Z-mcpo`.
 
 ### Option B: Build the container locally
 
