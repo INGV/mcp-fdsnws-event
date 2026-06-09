@@ -15,7 +15,6 @@
 
 ### Release 1.1.0 (2026-06-08)
   - feat: add Docker Hub CI/CD (multi-arch amd64/arm64), AGPL-3.0-or-later license and project metadata (publiccode.yml, AUTHORS.md)
-  - docs: add project context (CONTEXT.md), ADRs and feature planning artifacts
   - ci: bump GitHub Actions to Node.js 24 compatible major versions
 
 ### Release 1.0.0 (2026-06-08)
