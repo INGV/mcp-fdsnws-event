@@ -47,6 +47,11 @@ _DATACENTER_NOTE = (
     "Available datacenters: INGV (default), IRIS, EMSC, GFZ, and others supported by ObsPy."
 )
 
+_EVENTID_NOTE = (
+    "The eventid MUST be taken from a prior fdsn_query_earthquakes result "
+    "(EventID column). Never invent, guess, or use placeholder values.\n\n"
+)
+
 
 def _error_payload(e: DatacenterError) -> str:
     """Render an upstream datacenter failure as a structured JSON error result."""
@@ -54,6 +59,34 @@ def _error_payload(e: DatacenterError) -> str:
         {"error": True, "datacenter": e.datacenter, "api_url": e.api_url, "message": e.message},
         indent=2,
     )
+
+
+def _not_found_payload(datacenter: str, api_url: str, eventid: int, **empty_fields) -> str:
+    """Render the 'event not found' state (empty catalog) with an actionable message.
+
+    ``empty_fields`` carries the tool-specific empty result keys (e.g.
+    ``arrivals_count=0, arrivals=[]``) so the response shape stays stable.
+    """
+    return json.dumps(
+        {
+            "datacenter": datacenter,
+            "api_url": api_url,
+            "found": False,
+            "event_id": None,
+            "message": (
+                f"No event with eventid={eventid} found at {datacenter}. "
+                "The eventid must come from a fdsn_query_earthquakes result "
+                "(EventID column); verify it and retry."
+            ),
+            **empty_fields,
+        },
+        indent=2,
+    )
+
+
+def _absent_resource_message(event_id, datacenter: str, resource: str) -> str:
+    """Message for the 'event found but the requested sub-resource is absent' state."""
+    return f"Event {event_id} exists at {datacenter} but has no {resource}."
 
 
 @mcp.tool(
@@ -178,6 +211,7 @@ async def fdsn_query_earthquakes(
         "Returns the preferred origin, preferred magnitude, station magnitudes, and amplitudes.\n"
         "For detailed data (all alternative origins, all alternative magnitudes, or seismic "
         "arrivals/picks), use the specialized tools instead.\n\n"
+        + _EVENTID_NOTE
         + _DATACENTER_NOTE
     ),
     annotations=_QUERY_ANNOTATIONS,
@@ -196,13 +230,14 @@ async def fdsn_get_earthquake_by_id(eventid: int, datacenter: str = "INGV") -> s
         return _error_payload(e)
 
     if len(catalog) == 0:
-        return json.dumps(
-            {"datacenter": params.datacenter, "api_url": api_url, "event": None}, indent=2
-        )
+        return _not_found_payload(params.datacenter, api_url, params.eventid, event=None)
 
     event_data = event_to_full_dict(catalog[0])
     return json.dumps(
-        {"datacenter": params.datacenter, "api_url": api_url, "event": event_data},
+        {
+            "datacenter": params.datacenter, "api_url": api_url,
+            "found": True, "event": event_data,
+        },
         indent=2, default=str,
     )
 
@@ -213,6 +248,7 @@ async def fdsn_get_earthquake_by_id(eventid: int, datacenter: str = "INGV") -> s
         "Get all seismic phase arrivals for an earthquake event, including linked "
         "pick data (station, time, phase). Use this when asked about recorded phases, "
         "station readings, or seismic wave arrivals.\n\n"
+        + _EVENTID_NOTE
         + _DATACENTER_NOTE
     ),
     annotations=_QUERY_ANNOTATIONS,
@@ -231,24 +267,27 @@ async def fdsn_get_arrivals_by_id(eventid: int, datacenter: str = "INGV") -> str
         return _error_payload(e)
 
     if len(catalog) == 0:
-        return json.dumps(
-            {"datacenter": params.datacenter, "api_url": api_url, "event_id": None,
-             "arrivals_count": 0, "arrivals": []}, indent=2,
+        return _not_found_payload(
+            params.datacenter, api_url, params.eventid,
+            arrivals_count=0, arrivals=[], picks=[],
         )
 
     event = catalog[0]
+    event_id = _extract_event_id(event)
     origin = event.preferred_origin()
     arrivals = [obspy_to_dict(a) for a in origin.arrivals] if origin else []
     picks = [obspy_to_dict(p) for p in event.picks]
 
-    return json.dumps(
-        {
-            "datacenter": params.datacenter, "api_url": api_url,
-            "event_id": _extract_event_id(event),
-            "arrivals_count": len(arrivals), "arrivals": arrivals, "picks": picks,
-        },
-        indent=2, default=str,
-    )
+    result = {
+        "datacenter": params.datacenter, "api_url": api_url,
+        "found": True, "event_id": event_id,
+        "arrivals_count": len(arrivals), "arrivals": arrivals, "picks": picks,
+    }
+    if len(arrivals) == 0:
+        result["message"] = _absent_resource_message(
+            event_id, params.datacenter, "phase arrivals"
+        )
+    return json.dumps(result, indent=2, default=str)
 
 
 @mcp.tool(
@@ -257,6 +296,7 @@ async def fdsn_get_arrivals_by_id(eventid: int, datacenter: str = "INGV") -> str
         "Get all computed magnitude solutions for an earthquake event. "
         "Use this when asked about different magnitude types (ML, Mw, Mb, Md), "
         "magnitude comparisons across agencies, or station counts.\n\n"
+        + _EVENTID_NOTE
         + _DATACENTER_NOTE
     ),
     annotations=_QUERY_ANNOTATIONS,
@@ -275,21 +315,24 @@ async def fdsn_get_allmagnitudes_by_id(eventid: int, datacenter: str = "INGV") -
         return _error_payload(e)
 
     if len(catalog) == 0:
-        return json.dumps(
-            {"datacenter": params.datacenter, "api_url": api_url, "event_id": None,
-             "magnitudes_count": 0, "magnitudes": []}, indent=2,
+        return _not_found_payload(
+            params.datacenter, api_url, params.eventid,
+            magnitudes_count=0, magnitudes=[],
         )
 
     event = catalog[0]
+    event_id = _extract_event_id(event)
     magnitudes = _items_with_preferred(event.magnitudes, event.preferred_magnitude_id)
-    return json.dumps(
-        {
-            "datacenter": params.datacenter, "api_url": api_url,
-            "event_id": _extract_event_id(event),
-            "magnitudes_count": len(magnitudes), "magnitudes": magnitudes,
-        },
-        indent=2, default=str,
-    )
+    result = {
+        "datacenter": params.datacenter, "api_url": api_url,
+        "found": True, "event_id": event_id,
+        "magnitudes_count": len(magnitudes), "magnitudes": magnitudes,
+    }
+    if len(magnitudes) == 0:
+        result["message"] = _absent_resource_message(
+            event_id, params.datacenter, "magnitude solutions"
+        )
+    return json.dumps(result, indent=2, default=str)
 
 
 @mcp.tool(
@@ -298,6 +341,7 @@ async def fdsn_get_allmagnitudes_by_id(eventid: int, datacenter: str = "INGV") -
         "Get all computed origin solutions (hypocenter locations) for an earthquake event. "
         "Use this when asked about alternative locations, origin comparisons, or which "
         "agencies computed origins.\n\n"
+        + _EVENTID_NOTE
         + _DATACENTER_NOTE
     ),
     annotations=_QUERY_ANNOTATIONS,
@@ -316,21 +360,24 @@ async def fdsn_get_allorigins_by_id(eventid: int, datacenter: str = "INGV") -> s
         return _error_payload(e)
 
     if len(catalog) == 0:
-        return json.dumps(
-            {"datacenter": params.datacenter, "api_url": api_url, "event_id": None,
-             "origins_count": 0, "origins": []}, indent=2,
+        return _not_found_payload(
+            params.datacenter, api_url, params.eventid,
+            origins_count=0, origins=[],
         )
 
     event = catalog[0]
+    event_id = _extract_event_id(event)
     origins = _items_with_preferred(event.origins, event.preferred_origin_id)
-    return json.dumps(
-        {
-            "datacenter": params.datacenter, "api_url": api_url,
-            "event_id": _extract_event_id(event),
-            "origins_count": len(origins), "origins": origins,
-        },
-        indent=2, default=str,
-    )
+    result = {
+        "datacenter": params.datacenter, "api_url": api_url,
+        "found": True, "event_id": event_id,
+        "origins_count": len(origins), "origins": origins,
+    }
+    if len(origins) == 0:
+        result["message"] = _absent_resource_message(
+            event_id, params.datacenter, "origin solutions"
+        )
+    return json.dumps(result, indent=2, default=str)
 
 
 @mcp.tool(
@@ -340,6 +387,7 @@ async def fdsn_get_allorigins_by_id(eventid: int, datacenter: str = "INGV") -> s
         "Returns nodal planes (strike, dip, rake), principal axes (T, P, N), "
         "and moment tensor components when available. Use this for understanding "
         "the rupture geometry and seismic source characteristics.\n\n"
+        + _EVENTID_NOTE
         + _DATACENTER_NOTE
     ),
     annotations=_QUERY_ANNOTATIONS,
@@ -358,23 +406,26 @@ async def fdsn_get_focalmechanism_by_id(eventid: int, datacenter: str = "INGV") 
         return _error_payload(e)
 
     if len(catalog) == 0:
-        return json.dumps(
-            {"datacenter": params.datacenter, "api_url": api_url, "event_id": None,
-             "focal_mechanisms_count": 0, "focal_mechanisms": []}, indent=2,
+        return _not_found_payload(
+            params.datacenter, api_url, params.eventid,
+            focal_mechanisms_count=0, focal_mechanisms=[],
         )
 
     event = catalog[0]
+    event_id = _extract_event_id(event)
     focal_mechanisms = _items_with_preferred(
         event.focal_mechanisms, event.preferred_focal_mechanism_id,
     )
-    return json.dumps(
-        {
-            "datacenter": params.datacenter, "api_url": api_url,
-            "event_id": _extract_event_id(event),
-            "focal_mechanisms_count": len(focal_mechanisms), "focal_mechanisms": focal_mechanisms,
-        },
-        indent=2, default=str,
-    )
+    result = {
+        "datacenter": params.datacenter, "api_url": api_url,
+        "found": True, "event_id": event_id,
+        "focal_mechanisms_count": len(focal_mechanisms), "focal_mechanisms": focal_mechanisms,
+    }
+    if len(focal_mechanisms) == 0:
+        result["message"] = _absent_resource_message(
+            event_id, params.datacenter, "focal mechanism solutions"
+        )
+    return json.dumps(result, indent=2, default=str)
 
 
 def main():

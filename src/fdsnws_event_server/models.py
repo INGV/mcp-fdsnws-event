@@ -153,7 +153,14 @@ class GetEarthquakeByIdInput(BaseModel):
         extra="forbid",
     )
 
-    eventid: int = Field(..., gt=0, description="FDSN event ID (positive integer)")
+    eventid: int = Field(
+        ...,
+        gt=0,
+        description=(
+            "Numeric FDSN event ID. MUST be taken from the EventID column of a prior "
+            "fdsn_query_earthquakes result. Do NOT invent, guess, or use placeholder values."
+        ),
+    )
     datacenter: str = Field(
         default="INGV",
         description="FDSN datacenter to query (e.g., INGV, IRIS, EMSC, GFZ)",
@@ -166,7 +173,14 @@ class GetArrivalsByIdInput(BaseModel):
         extra="forbid",
     )
 
-    eventid: int = Field(..., gt=0, description="FDSN event ID")
+    eventid: int = Field(
+        ...,
+        gt=0,
+        description=(
+            "Numeric FDSN event ID. MUST be taken from the EventID column of a prior "
+            "fdsn_query_earthquakes result. Do NOT invent, guess, or use placeholder values."
+        ),
+    )
     datacenter: str = Field(
         default="INGV",
         description="FDSN datacenter to query (e.g., INGV, IRIS, EMSC, GFZ)",
@@ -179,7 +193,14 @@ class GetAllOriginsByIdInput(BaseModel):
         extra="forbid",
     )
 
-    eventid: int = Field(..., gt=0, description="FDSN event ID")
+    eventid: int = Field(
+        ...,
+        gt=0,
+        description=(
+            "Numeric FDSN event ID. MUST be taken from the EventID column of a prior "
+            "fdsn_query_earthquakes result. Do NOT invent, guess, or use placeholder values."
+        ),
+    )
     datacenter: str = Field(
         default="INGV",
         description="FDSN datacenter to query (e.g., INGV, IRIS, EMSC, GFZ)",
@@ -192,7 +213,14 @@ class GetAllMagnitudesByIdInput(BaseModel):
         extra="forbid",
     )
 
-    eventid: int = Field(..., gt=0, description="FDSN event ID")
+    eventid: int = Field(
+        ...,
+        gt=0,
+        description=(
+            "Numeric FDSN event ID. MUST be taken from the EventID column of a prior "
+            "fdsn_query_earthquakes result. Do NOT invent, guess, or use placeholder values."
+        ),
+    )
     datacenter: str = Field(
         default="INGV",
         description="FDSN datacenter to query (e.g., INGV, IRIS, EMSC, GFZ)",
@@ -205,7 +233,14 @@ class GetFocalMechanismByIdInput(BaseModel):
         extra="forbid",
     )
 
-    eventid: int = Field(..., gt=0, description="FDSN event ID")
+    eventid: int = Field(
+        ...,
+        gt=0,
+        description=(
+            "Numeric FDSN event ID. MUST be taken from the EventID column of a prior "
+            "fdsn_query_earthquakes result. Do NOT invent, guess, or use placeholder values."
+        ),
+    )
     datacenter: str = Field(
         default="INGV",
         description="FDSN datacenter to query (e.g., INGV, IRIS, EMSC, GFZ)",
