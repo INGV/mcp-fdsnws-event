@@ -35,11 +35,11 @@ Prebuilt multi-arch images (linux/amd64, linux/arm64) are published on Docker Hu
 docker pull ingv/mcp-fdsnws-event
 
 # A specific version
-docker pull ingv/mcp-fdsnws-event:1.0.0
+docker pull ingv/mcp-fdsnws-event:1.2.0
 ```
 
 > An `mcpo` variant (OpenAPI/REST wrapper, see below) is published under the same
-> repository with a `-mcpo` suffix, e.g. `ingv/mcp-fdsnws-event:1.0.0-mcpo` and
+> repository with a `-mcpo` suffix, e.g. `ingv/mcp-fdsnws-event:1.2.0-mcpo` and
 > `ingv/mcp-fdsnws-event:latest-mcpo`.
 
 ### Option B: Build the container locally
@@ -50,7 +50,7 @@ git clone https://github.com/INGV/mcp-fdsnws-event.git
 cd mcp-fdsnws-event
 
 # Build the Docker image
-docker build --no-cache -t mcp-fdsnws-event-server .
+docker build --no-cache -t ingv/mcp-fdsnws-event .
 ```
 
 ## Usage
@@ -75,7 +75,7 @@ The server listens for MCP connections over stdio.
 
 # Individual runs (if needed)
 # Unit tests (offline)
-docker run --rm mcp-fdsnws-event-server pytest
+docker run --rm ingv/mcp-fdsnws-event pytest
 
 # MCP protocol smoke test
 echo -e '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0.0"}}}\n{"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}}\n{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}' | docker run -i --rm mcp-fdsnws-event-server
@@ -274,13 +274,13 @@ Pull and run the published `mcpo` image (recommended):
 
 ```bash
 docker pull ingv/mcp-fdsnws-event:latest-mcpo
-docker run -d -p 8000:8000 --name fdsnws-mcpo ingv/mcp-fdsnws-event:latest-mcpo
+docker run -d -p 8000:8000 --name mcp-fdsnws-event_mcpo ingv/mcp-fdsnws-event:latest-mcpo
 ```
 
 Or build it locally (for development):
 
 ```bash
-docker build -t mcp-fdsnws-event-server .            # base image
+docker build -t ingv/mcp-fdsnws-event .              # base image
 docker compose -f compose.mcpo.yml up -d --build     # mcpo wrapper on :8000
 ```
 
