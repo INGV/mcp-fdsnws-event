@@ -1,6 +1,6 @@
 # Release Notes
 
-### Release 1.3.0-dev (2026-06-09)
+### Release 1.3.0 (2026-06-09)
   - feat: by-id tools now distinguish "event not found" from "event found but the requested sub-resource is absent" via a three-state `found` / `message` contract (ADR-0006)
   - feat: `eventid` parameter descriptions state provenance (must come from a prior `fdsn_query_earthquakes` result) and forbid invented/placeholder values
   - test: add by-id three-state contract tests and a standalone OpenWebUI A/B harness for the eventid-hallucination failure mode

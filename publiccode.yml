@@ -4,10 +4,10 @@
 
 publiccodeYmlVersion: "0"
 name: "INGV - FDSNWS Event MCP Server"
-releaseDate: 2026-06-08
+releaseDate: 2026-06-09
 url: "https://github.com/INGV/mcp-fdsnws-event"
 landingURL: "https://github.com/INGV/mcp-fdsnws-event"
-softwareVersion: v1.3.0-dev
+softwareVersion: v1.3.0
 developmentStatus: stable
 softwareType: standalone/backend
 platforms:
