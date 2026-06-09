@@ -7,7 +7,7 @@ name: "INGV - FDSNWS Event MCP Server"
 releaseDate: 2026-06-09
 url: "https://github.com/INGV/mcp-fdsnws-event"
 landingURL: "https://github.com/INGV/mcp-fdsnws-event"
-softwareVersion: v1.3.0
+softwareVersion: v1.4.0-dev
 developmentStatus: stable
 softwareType: standalone/backend
 platforms:
