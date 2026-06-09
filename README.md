@@ -305,6 +305,33 @@ In OpenWebUI go to **Settings → Tools** (or **Admin → Settings → Tools**) 
 > `mcpo ... -- python -m fdsnws_event_server.server`, so it does **not** mount the Docker
 > socket or spawn nested containers.
 
+### Validating tool-call reliability (A/B harness)
+
+When a client model loses an identifier across turns it may *invent* one — e.g.
+calling `fdsn_get_arrivals_by_id` with a placeholder `eventid` (`123456`) instead
+of the `EventID` returned by a prior `fdsn_query_earthquakes`. The server guards
+against this with a three-state by-id contract (`found` / `message`, see
+`docs/adr/0006`), but the behaviour itself lives in the OpenWebUI ↔ model loop and
+is best measured empirically.
+
+`tests/ab/eventid_hallucination_ab.py` is a standalone A/B harness (not run by
+`pytest`) that replays the failing conversation against a live model through the
+OpenWebUI OpenAI-compatible API and reports how often the model passes the correct
+`eventid` vs an invented one. It takes the model and base URL as arguments:
+
+```bash
+export OPENWEBUI_API_KEY=sk-...        # OpenWebUI: Settings → Account → API Keys
+python tests/ab/eventid_hallucination_ab.py \
+    --base-url http://<host>:8080 \
+    --model <model-id-as-listed-in-openwebui> \
+    --repeat 10 --variant both --temperature 0.7
+```
+
+It fails fast if `--model` is not present on the instance, and compares two tool
+descriptions (`baseline` vs `fixed`) so you can attribute any delta to the
+server-side wording. Use it to check a new model, or to confirm that an OpenWebUI
+configuration change (e.g. **Native** function calling) actually fixes id reuse.
+
 ## License
 
 This project is released under the **GNU Affero General Public License v3.0 or
