@@ -21,3 +21,10 @@ htmlcov/
 
 # OS / editor
 .DS_Store
+
+# Local planning / working notes and assistant files (not versioned)
+plan/
+tasks/
+docs/
+CLAUDE.md
+CONTEXT.md
