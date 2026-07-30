@@ -225,11 +225,27 @@ def event_to_full_dict(event) -> dict:
 
 
 def _extract_event_id(event) -> str:
-    """Extract numeric event ID from an ObsPy Event resource_id."""
+    """Extract the provider's event ID from an ObsPy Event resource_id.
+
+    QuakeML resource identifiers are free-form URIs and every datacenter spells them
+    differently. The four shapes observed in practice:
+
+        INGV  smi:webservices.ingv.it/fdsnws/event/1/query?eventId=37258271
+        USGS  quakeml:earthquake.usgs.gov/fdsnws/event/1/query?eventid=us6000m0yg&format=quakeml
+        GFZ   smi:org.gfz-potsdam.de/geofon/gfz2024abmz
+        EMSC  quakeml:eu.emsc/event/20240101_0000328
+
+    So: take the id from an ``eventid`` query parameter when there is one, matching
+    the name case-insensitively and the value as an opaque token -- the previous
+    ``eventId=(\\d+)`` pattern was INGV-specific on both counts, and on USGS it missed
+    and let the fallback return the whole query string. Otherwise fall back to the
+    last path segment, with the query string stripped first so it cannot leak in.
+    """
     rid = str(event.resource_id)
-    # resource_id may be "smi:...fdsnws/event/1/query?eventId=12345"
-    m = re.search(r"eventId=(\d+)", rid)
-    return m.group(1) if m else rid.split("/")[-1]
+    m = re.search(r"[?&]eventid=([^&#]+)", rid, re.IGNORECASE)
+    if m:
+        return m.group(1)
+    return rid.split("?", 1)[0].rstrip("/").split("/")[-1]
 
 
 async def _get_events_quakeml(eventid: str, datacenter: str, **extra) -> tuple[Catalog, str]:
