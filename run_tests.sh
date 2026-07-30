@@ -2,7 +2,8 @@
 # Complete test suite for the FDSNWS Event MCP server.
 #
 # By default runs the offline unit tests + the MCP protocol smoke test.
-# Pass --integration to also run the live tests against INGV (network required).
+# Pass --integration to also run the live tests against the advertised datacenters
+# (INGV, EMSC, GFZ, USGS; network required).
 set -euo pipefail
 
 RUN_INTEGRATION=0
@@ -25,7 +26,7 @@ docker run --rm "${IMAGE}" pytest -q
 
 if [[ "${RUN_INTEGRATION}" -eq 1 ]]; then
     echo ""
-    echo "Step 3/4: Integration tests (live INGV)..."
+    echo "Step 3/4: Integration tests (live INGV, EMSC, GFZ, USGS)..."
     docker run --rm "${IMAGE}" pytest -q -m integration
 else
     echo ""
