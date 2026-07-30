@@ -1,0 +1,14 @@
+Error 501: Not Implemented
+
+includearrivals parameter is not supported
+
+Usage details are available from https://earthquake.usgs.gov/fdsnws/event/1
+
+Request:
+/fdsnws/event/1/query?eventid=us6000m0yg&amp;includearrivals=true&amp;format=xml
+
+Request Submitted:
+2026-07-30T11:42:46+00:00
+
+Service version:
+2.7.0

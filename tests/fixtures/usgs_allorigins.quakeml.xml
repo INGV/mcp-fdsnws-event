@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<q:quakeml xmlns="http://quakeml.org/xmlns/bed/1.2" xmlns:anss="http://anss.org/xmlns/event/0.1" xmlns:catalog="http://anss.org/xmlns/catalog/0.1" xmlns:q="http://quakeml.org/xmlns/quakeml/1.2">
+ <eventParameters publicID="quakeml:earthquake.usgs.gov/fdsnws/event/1/query?eventid=us6000m0yg&amp;includeallorigins=true&amp;format=xml">
+  <event catalog:datasource="us" catalog:eventsource="us" catalog:eventid="6000m0yg" publicID="quakeml:earthquake.usgs.gov/fdsnws/event/1/query?eventid=us6000m0yg&amp;format=quakeml">
+   <description>
+    <type>earthquake name</type>
+    <text>73 km WSW of Sado, Japan</text>
+   </description>
+   <origin catalog:datasource="us" catalog:dataid="us6000m0yg" catalog:eventsource="us" catalog:eventid="6000m0yg" publicID="quakeml:earthquake.usgs.gov/product/origin/us6000m0yg/us/1710020303040">
+    <time>
+     <value>2024-01-01T09:45:26.217Z</value>
+    </time>
+    <longitude>
+     <value>137.5664</value>
+    </longitude>
+    <latitude>
+     <value>37.8107</value>
+    </latitude>
+    <depth>
+     <value>10000</value>
+     <uncertainty>1835</uncertainty>
+    </depth>
+    <originUncertainty>
+     <horizontalUncertainty>5230</horizontalUncertainty>
+     <preferredDescription>horizontal uncertainty</preferredDescription>
+    </originUncertainty>
+    <quality>
+     <usedPhaseCount>65</usedPhaseCount>
+     <usedStationCount>65</usedStationCount>
+     <standardError>1.19</standardError>
+     <azimuthalGap>90</azimuthalGap>
+     <minimumDistance>0.592</minimumDistance>
+    </quality>
+    <evaluationMode>manual</evaluationMode>
+    <creationInfo>
+     <agencyID>us</agencyID>
+     <creationTime>2024-03-09T21:38:23.040Z</creationTime>
+    </creationInfo>
+   </origin>
+   <magnitude catalog:datasource="us" catalog:dataid="us6000m0yg" catalog:eventsource="us" catalog:eventid="6000m0yg" publicID="quakeml:earthquake.usgs.gov/product/origin/us6000m0yg/us/1710020303040#magnitude">
+    <mag>
+     <value>5.1</value>
+     <uncertainty>0.085</uncertainty>
+    </mag>
+    <type>mb</type>
+    <stationCount>45</stationCount>
+    <originID>quakeml:earthquake.usgs.gov/product/origin/us6000m0yg/us/1710020303040</originID>
+    <evaluationMode>manual</evaluationMode>
+    <creationInfo>
+     <agencyID>us</agencyID>
+     <creationTime>2024-03-09T21:38:23.040Z</creationTime>
+    </creationInfo>
+   </magnitude>
+   <preferredOriginID>quakeml:earthquake.usgs.gov/product/origin/us6000m0yg/us/1710020303040</preferredOriginID>
+   <preferredMagnitudeID>quakeml:earthquake.usgs.gov/product/origin/us6000m0yg/us/1710020303040#magnitude</preferredMagnitudeID>
+   <type>earthquake</type>
+   <creationInfo>
+    <agencyID>us</agencyID>
+    <creationTime>2024-03-09T21:38:23.040Z</creationTime>
+   </creationInfo>
+  </event>
+  <creationInfo>
+   <creationTime>2026-07-30T11:35:28.000Z</creationTime>
+  </creationInfo>
+ </eventParameters>
+</q:quakeml>

@@ -248,11 +248,18 @@ def _extract_event_id(event) -> str:
     return rid.split("?", 1)[0].rstrip("/").split("/")[-1]
 
 
+# The FDSN include flags the by-id tools legitimately request. Used to tell a provider
+# that does not implement a subresource from a typo of ours: ObsPy reports both as the
+# same TypeError, so the parameter name is the only thing that distinguishes them.
+_INCLUDE_FLAGS = frozenset({"includearrivals", "includeallmagnitudes", "includeallorigins"})
+
+
 async def _get_events_quakeml(eventid: str, datacenter: str, **extra) -> tuple[Catalog, str]:
     """Shared QuakeML fetch by event id for the detail tools.
 
-    Raises DatacenterError on upstream HTTP/network failure; HTTP 204 returns an
-    empty Catalog. ``extra`` carries include flags (includearrivals, etc.).
+    Raises DatacenterError on upstream HTTP/network failure, and on a provider that
+    does not implement a requested include flag; HTTP 204 returns an empty Catalog.
+    ``extra`` carries include flags (includearrivals, etc.).
     """
     fdsn_client = _get_client(datacenter)
     endpoint = _event_query_url(datacenter)
@@ -267,6 +274,26 @@ async def _get_events_quakeml(eventid: str, datacenter: str, **extra) -> tuple[C
         return (Catalog(), api_url)
     except FDSNException as e:
         raise DatacenterError(str(e), datacenter=datacenter, api_url=api_url) from e
+    except TypeError as e:
+        # ObsPy refuses include flags the provider's WADL does not advertise, raising a
+        # bare TypeError before any request goes out (client.py: "The parameter '...' is
+        # not supported by the service."). EMSC, for one, does not implement
+        # includeallmagnitudes. Left alone this escapes the tool as an unhandled
+        # exception, whereas a provider simply not offering a subresource is an upstream
+        # limitation and belongs in the same structured error contract as an HTTP failure.
+        #
+        # The message alone cannot be the test: ObsPy words a typo in *our* kwargs
+        # identically. So convert only when the rejected parameter is one of the flags
+        # this module legitimately sends; anything else is our bug and must keep
+        # crashing rather than be reported to the client as an upstream problem.
+        rejected = re.search(r"The parameter '([^']+)' is not supported", str(e))
+        if not rejected or rejected.group(1) not in _INCLUDE_FLAGS:
+            raise
+        raise DatacenterError(
+            f"{e} Datacenter '{datacenter}' does not implement this subresource.",
+            datacenter=datacenter,
+            api_url=api_url,
+        ) from e
 
     return (catalog, api_url)
 

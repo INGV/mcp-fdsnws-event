@@ -1,0 +1,64 @@
+<?xml version="1.0"?>
+<q:quakeml xmlns:q="http://quakeml.org/xmlns/quakeml/1.2"  xmlns="http://quakeml.org/xmlns/bed/1.2">
+<eventParameters publicID="smi:eu.emsc/unid">
+<event publicID="quakeml:eu.emsc/event/20240101_0000328">
+  <preferredOriginID>quakeml:eu.emsc/event/20240101_0000328/origin/IEEOEUGES</preferredOriginID>
+  <preferredMagnitudeID>quakeml:eu.emsc/event/20240101_0000328/origin/IEEOEUGES/mag/1</preferredMagnitudeID>
+  <creationInfo>
+    <agencyURI>smi:smi-registry/organization/EMSC</agencyURI>
+    <authorURI>smi:smi-registry/organization/EMSC</authorURI>
+    <creationTime>2024-01-01T22:25:44.79986Z</creationTime>
+  </creationInfo>
+  <description>
+    <text>NEAR WEST COAST OF HONSHU, JAPAN</text>
+    <type>Flinn-Engdahl region</type>
+  </description>
+  <origin publicID="quakeml:eu.emsc/event/20240101_0000328/origin/IEEOEUGES">
+    <time>
+      <value>2024-01-01T19:42:06.89Z</value>
+      <uncertainty>0.20</uncertainty>
+    </time>
+    <latitude>
+      <value>37.2175</value>
+      <uncertainty>4.50</uncertainty>
+    </latitude>
+    <longitude>
+      <value>136.7001</value>
+      <uncertainty>3.60</uncertainty>
+    </longitude>
+    <depth>
+      <value>10000.0</value>
+    </depth>
+    <depthType>from location</depthType>
+    <methodID>smi:eu.emsc-csem/origin_method/NA</methodID>
+    <quality>
+      <usedPhaseCount>303</usedPhaseCount>
+      <usedStationCount>175</usedStationCount>
+      <standardError>1.41</standardError>
+      <azimuthalGap>38.0</azimuthalGap>
+      <minimumDistance>1.379</minimumDistance>
+      <maximumDistance>156.033</maximumDistance>
+    </quality>
+    <evaluationMode>manual</evaluationMode>
+    <creationInfo>
+      <agencyURI>smi:smi-registry/organization/EMSC</agencyURI>
+      <authorURI>smi:smi-registry/organization/EMSC</authorURI>
+    </creationInfo>
+    <originUncertainty>
+      <azimuthMaxHorizontalUncertainty>108.0</azimuthMaxHorizontalUncertainty>
+    </originUncertainty>
+  </origin>
+  <magnitude publicID="quakeml:eu.emsc/event/20240101_0000328/origin/IEEOEUGES/mag/1">
+    <mag>
+      <value>5.1</value>
+    </mag>
+    <type>mb</type>
+    <originID>quakeml:eu.emsc/event/20240101_0000328/origin/IEEOEUGES</originID>
+    <creationInfo>
+      <agencyURI>smi:smi-registry/organization/EMSC</agencyURI>
+      <authorURI>smi:smi-registry/organization/EMSC</authorURI>
+    </creationInfo>
+  </magnitude>
+</event>
+</eventParameters>
+</q:quakeml>

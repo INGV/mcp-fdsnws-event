@@ -68,6 +68,37 @@ identifiers. Both are why parsing is header-driven and why `eventid` is a string
 IRIS/EarthScope is deliberately absent: its FDSNWS **event** service returns
 HTTP 410, so there is nothing to capture.
 
+The `*.quakeml.xml` files do the same for the **by-id** path: one captured QuakeML
+document per provider and per include-flag set (`plain`, `arrivals`,
+`allmagnitudes`, `allorigins`), parsed through ObsPy exactly as in production. What
+they test is our serialization of each provider's real event structure, so the
+by-id half of the matrix also survives an outage. `focalmechanism` shares the
+`allmagnitudes` document, because it sends the same flag.
+
+All five by-id tools against all four providers is twenty cells. Three have no
+document to capture, because the provider does not implement the flag: EMSC refuses
+`includeallmagnitudes` (HTTP 400), which takes out both `allmagnitudes` and
+`focalmechanism`, and USGS refuses `includearrivals` (HTTP 501). Those responses are
+captured verbatim as `*.error.txt` and asserted instead, which is what pins the three
+cells. The remaining seventeen are driven from QuakeML.
+
+The INGV event is `45376822` (Mw 3.5, Moggio Udinese, 2026-03-19), chosen because it
+is complete: 150 arrivals, 6 origins, 6 magnitudes, 575 station magnitudes, 1235
+amplitudes, and a focal mechanism with a moment tensor. Every INGV cell therefore has
+real content to serialize rather than an empty subresource.
+
+`ingv_no_arrivals.quakeml.xml` is a second INGV event, `37258271`, kept only because
+it has **no** arrivals and so is the one document that exercises the three-state
+contract from captured data: event found, subresource absent, explained in `message`
+rather than returned as an empty payload. That is a property of that event, **not** of
+INGV, which implements `includearrivals` and publishes arrivals for others.
+
+Sizes are deliberate, not an oversight. The INGV documents run to ~2 MB each and the
+EMSC arrivals one to ~580 kB, because these are real, fully populated events; picking
+smaller ones would drop the only fixtures that exercise large nested payloads. XML
+this repetitive compresses about thirtyfold, so the four INGV documents cost ~260 kB
+of history despite occupying ~8 MB in a checkout.
+
 ## Conventions
 
 - Unit tests must not touch the network — mock `requests.get` (see
