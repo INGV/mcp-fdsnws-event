@@ -79,9 +79,12 @@ does not implement the flag: EMSC refuses `includeallmagnitudes` (HTTP 400) and
 USGS refuses `includearrivals` (HTTP 501). Their responses are captured verbatim as
 `*.error.txt` and asserted instead, which is what pins those two cells.
 
-INGV publishes no arrivals for its event, so `ingv_arrivals.quakeml.xml` is the case
-where the three-state contract fires: event found, subresource absent, explained in
-`message` rather than returned as an empty payload.
+`ingv_arrivals.quakeml.xml` is byte-identical to `ingv_plain.quakeml.xml`, and that is
+a property of the chosen event, **not** of INGV: INGV implements `includearrivals` and
+does publish arrivals (event `46168972`, for one, returns 117 arrivals and 224 picks).
+Event `37258271` simply has none. The fixture is therefore the case where the
+three-state contract fires: event found, subresource absent, explained in `message`
+rather than returned as an empty payload.
 
 The EMSC arrivals document is ~580 kB. That is deliberate: it is a real event with
 316 arrivals, and picking a smaller one would drop the only fixture that exercises a

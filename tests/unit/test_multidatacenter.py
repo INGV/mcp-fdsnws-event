@@ -389,9 +389,10 @@ def test_byid_serializes_real_provider_quakeml(
     assert out["event_id"] == eventid
     assert isinstance(out[count_key], int)
     if out[count_key] == 0:
-        # Three-state contract: the event exists but this provider published no such
-        # subresource for it, which must be said rather than returned as an empty
-        # payload. INGV genuinely publishes no arrivals for this event.
+        # Three-state contract: the event exists but carries no such subresource,
+        # which must be said rather than returned as an empty payload. Hit by
+        # INGV/arrivals -- a property of event 37258271, not of INGV, which does
+        # implement includearrivals and does publish arrivals for other events.
         assert out["message"]
     else:
         # "origins_count" counts "origins", and so on.
