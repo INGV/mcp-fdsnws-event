@@ -1,7 +1,7 @@
 # Release Notes
 
 ### Release 1.5.0-dev (2026-07-30)
-  - . . .
+  - docs: remove references to the architecture decision records from the README, the test documentation and the source comments. The records are kept locally under `docs/` and are not distributed, so the rationale they carried is now stated inline where it is needed
 
 ### Release 1.4.0 (2026-07-30)
   - fix: `eventid` is now an opaque string instead of an integer, which unlocks the GFZ and USGS identifier conventions and fixes silent corruption of EMSC identifiers containing underscores (`20240101_0000328` was rewritten to `202401010000328`, so a valid event was reported as absent). A JSON integer is still accepted and normalised
