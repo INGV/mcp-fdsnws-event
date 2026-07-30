@@ -1,7 +1,7 @@
 # Release Notes
 
 ### Release 1.7.0-dev (2026-07-30)
-  - . . .
+  - docs: state in the README that `compose.mcpo.yml` is a development configuration and not a hardened one, listing what it does not provide (it binds `0.0.0.0`, publishes the port on every interface, leaves authentication commented out, and bounds neither request rate nor upstream concurrency) and noting that those controls belong to the deployment rather than to the MCP server
 
 ### Release 1.6.0 (2026-07-30)
   - fix: report a provider that does not implement a requested `include*` flag through the structured error contract instead of crashing. ObsPy rejects such a flag from the provider's own service description by raising a bare `TypeError` before any request is issued, which escaped the by-id tools unhandled; EMSC does not implement `includeallmagnitudes` and USGS does not implement `includearrivals`, so `fdsn_get_allmagnitudes_by_id`, `fdsn_get_focalmechanism_by_id` and `fdsn_get_arrivals_by_id` were affected. The conversion is restricted to the flags this server actually sends, so a wrong keyword argument on our side still surfaces as a bug

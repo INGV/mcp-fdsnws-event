@@ -307,6 +307,15 @@ In OpenWebUI go to **Settings → Tools** (or **Admin → Settings → Tools**) 
   uncomment the `command:` line in `compose.mcpo.yml` to add `--api-key "<your-key>"`, then set
   the same key in OpenWebUI.
 
+> **`compose.mcpo.yml` is a development configuration, not a hardened one.** It binds
+> `0.0.0.0:8000` and publishes the port on every host interface, with authentication
+> commented out, no rate limiting and no bound on concurrent upstream requests. That is
+> fine on a workstation or inside a trusted network; it is not a public service. Exposing
+> it beyond a trusted network means at minimum binding to `127.0.0.1` behind a reverse
+> proxy that terminates TLS and enforces authentication and rate limits. Note that these
+> are properties of the deployment rather than of the MCP server, which is read-only,
+> stateless and holds no credentials — in stdio mode it opens no port at all.
+
 > The wrapper image bundles `mcpo` and the server in a single image and runs
 > `mcpo ... -- python -m fdsnws_event_server.server`, so it does **not** mount the Docker
 > socket or spawn nested containers.
