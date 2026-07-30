@@ -1,5 +1,8 @@
 # Release Notes
 
+### Release 1.8.0-dev (2026-07-30)
+  - . . .
+
 ### Release 1.7.0 (2026-07-30)
   - docs: state in the README that `compose.mcpo.yml` is a development configuration and not a hardened one, listing what it does not provide (it binds `0.0.0.0`, publishes the port on every interface, leaves authentication commented out, and bounds neither request rate nor upstream concurrency) and noting that those controls belong to the deployment rather than to the MCP server
 

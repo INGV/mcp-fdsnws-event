@@ -4,16 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-fdsnws-event-server"
-version = "1.7.0"
+version = "1.8.0-dev"
 description = "MCP server for the FDSNWS Event API (multi-datacenter)"
 authors = [
     {name = "Valentino Lauciani", email = "valentino.lauciani@ingv.it"}
 ]
 dependencies = [
-    # 1.7.0 is the first release exposing mcp.types.ToolAnnotations (used by
-    # server.py); mcp.server.fastmcp did not exist before 1.7.0. Any older release
+    # 1.8.0-dev is the first release exposing mcp.types.ToolAnnotations (used by
+    # server.py); mcp.server.fastmcp did not exist before 1.8.0-dev. Any older release
     # fails at import, so the previous ">=1.0.0" was never actually satisfiable.
-    "mcp>=1.7.0,<2",
+    "mcp>=1.8.0-dev,<2",
     "obspy>=1.4.2,<2",
     "pydantic>=2,<3",
     "requests>=2.31,<3"
