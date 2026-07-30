@@ -4,7 +4,7 @@
   - . . .
 
 ### Release 1.4.0 (2026-07-30)
-  - fix: `eventid` is now an opaque string instead of an integer, which unlocks the GFZ and USGS identifier conventions and fixes silent corruption of EMSC identifiers containing underscores (`20240101_0000328` was rewritten to `202401010000328`, so a valid event was reported as absent). A JSON integer is still accepted and normalised (ADR-0007)
+  - fix: `eventid` is now an opaque string instead of an integer, which unlocks the GFZ and USGS identifier conventions and fixes silent corruption of EMSC identifiers containing underscores (`20240101_0000328` was rewritten to `202401010000328`, so a valid event was reported as absent). A JSON integer is still accepted and normalised
   - fix: extract the event id from non-INGV resource identifiers, replacing an INGV-specific pattern that returned a query-string fragment for USGS
   - fix: correct the supported Python versions and pin dependencies: `requires-python >= 3.11`, `mcp >= 1.7.0` (the previous `>= 1.0.0` was unsatisfiable, since `mcp.server.fastmcp` and `ToolAnnotations` appeared in 1.6.0 and 1.7.0), plus bounded ranges for obspy, pydantic and requests
   - build: add `constraints.txt` pinning the full transitive dependency set, generated inside the `python:3.11-slim` release image
@@ -17,7 +17,7 @@
   - docs: replace IRIS with USGS as an advertised datacenter, the IRIS/EarthScope FDSNWS-Event service having been retired (HTTP 410). `IRIS` is still accepted and returns the upstream error verbatim
 
 ### Release 1.3.0 (2026-06-09)
-  - feat: by-id tools now distinguish "event not found" from "event found but the requested sub-resource is absent" via a three-state `found` / `message` contract (ADR-0006)
+  - feat: by-id tools now distinguish "event not found" from "event found but the requested sub-resource is absent" via a three-state `found` / `message` contract
   - feat: `eventid` parameter descriptions state provenance (must come from a prior `fdsn_query_earthquakes` result) and forbid invented/placeholder values
   - test: add by-id three-state contract tests and a standalone OpenWebUI A/B harness for the eventid-hallucination failure mode
   - docs: document the A/B harness in the README OpenWebUI section
