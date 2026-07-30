@@ -1,5 +1,8 @@
 # Release Notes
 
+### Release 1.5.0-dev (2026-07-30)
+  - . . .
+
 ### Release 1.4.0 (2026-07-30)
   - fix: `eventid` is now an opaque string instead of an integer, which unlocks the GFZ and USGS identifier conventions and fixes silent corruption of EMSC identifiers containing underscores (`20240101_0000328` was rewritten to `202401010000328`, so a valid event was reported as absent). A JSON integer is still accepted and normalised (ADR-0007)
   - fix: extract the event id from non-INGV resource identifiers, replacing an INGV-specific pattern that returned a query-string fragment for USGS
