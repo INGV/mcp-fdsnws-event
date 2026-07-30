@@ -1,5 +1,8 @@
 # Release Notes
 
+### Release 1.6.0-dev (2026-07-30)
+  - . . .
+
 ### Release 1.5.0 (2026-07-30)
   - docs: remove references to the architecture decision records from the README, the test documentation and the source comments. The records are kept locally under `docs/` and are not distributed, so the rationale they carried is now stated inline where it is needed
 
