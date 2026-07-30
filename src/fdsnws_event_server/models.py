@@ -172,7 +172,7 @@ class QueryEarthquakesInput(BaseModel):
     datacenter: str = Field(
         default="INGV",
         description=(
-            "FDSN datacenter to query (e.g., INGV, IRIS, EMSC, GFZ). "
+            "FDSN datacenter to query (e.g., INGV, EMSC, GFZ, USGS). "
             "Default INGV is an overridable convenience, not a binding"
         ),
     )
@@ -223,7 +223,7 @@ class GetEarthquakeByIdInput(BaseModel):
     eventid: EventId
     datacenter: str = Field(
         default="INGV",
-        description="FDSN datacenter to query (e.g., INGV, IRIS, EMSC, GFZ)",
+        description="FDSN datacenter to query (e.g., INGV, EMSC, GFZ, USGS)",
     )
 
 
@@ -236,7 +236,7 @@ class GetArrivalsByIdInput(BaseModel):
     eventid: EventId
     datacenter: str = Field(
         default="INGV",
-        description="FDSN datacenter to query (e.g., INGV, IRIS, EMSC, GFZ)",
+        description="FDSN datacenter to query (e.g., INGV, EMSC, GFZ, USGS)",
     )
 
 
@@ -249,7 +249,7 @@ class GetAllOriginsByIdInput(BaseModel):
     eventid: EventId
     datacenter: str = Field(
         default="INGV",
-        description="FDSN datacenter to query (e.g., INGV, IRIS, EMSC, GFZ)",
+        description="FDSN datacenter to query (e.g., INGV, EMSC, GFZ, USGS)",
     )
 
 
@@ -262,7 +262,7 @@ class GetAllMagnitudesByIdInput(BaseModel):
     eventid: EventId
     datacenter: str = Field(
         default="INGV",
-        description="FDSN datacenter to query (e.g., INGV, IRIS, EMSC, GFZ)",
+        description="FDSN datacenter to query (e.g., INGV, EMSC, GFZ, USGS)",
     )
 
 
@@ -275,5 +275,5 @@ class GetFocalMechanismByIdInput(BaseModel):
     eventid: EventId
     datacenter: str = Field(
         default="INGV",
-        description="FDSN datacenter to query (e.g., INGV, IRIS, EMSC, GFZ)",
+        description="FDSN datacenter to query (e.g., INGV, EMSC, GFZ, USGS)",
     )

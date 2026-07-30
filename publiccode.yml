@@ -43,7 +43,7 @@ description:
       seismological datacenters.
     documentation: "https://github.com/INGV/mcp-fdsnws-event/blob/main/README.md"
     longDescription: >
-      An MCP (Model Context Protocol) server that wraps the FDSN Web Service Event APIs of multiple seismological datacenters (INGV, IRIS, EMSC, GFZ, and other FDSN-compliant services) and provides earthquake data as JSON to MCP clients such as Claude Desktop.
+      An MCP (Model Context Protocol) server that wraps the FDSN Web Service Event APIs of multiple seismological datacenters (INGV, EMSC, GFZ, USGS, and other FDSN-compliant services) and provides earthquake data as JSON to MCP clients such as Claude Desktop.
 
       The server communicates over stdio (JSON-RPC 2.0) and uses ObsPy to query any FDSN-compliant datacenter. It exposes six tools: event search (compact tabular output), single-event detail, arrivals, magnitudes, origins, and focal mechanisms. An optional mcpo wrapper exposes the same tools as an OpenAPI/REST endpoint for OpenWebUI.
     localisedName: "FDSNWS Event MCP Server"

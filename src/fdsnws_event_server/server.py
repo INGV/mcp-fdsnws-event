@@ -45,7 +45,7 @@ _QUERY_ANNOTATIONS = ToolAnnotations(
 )
 
 _DATACENTER_NOTE = (
-    "Available datacenters: INGV (default), IRIS, EMSC, GFZ, and others supported by ObsPy."
+    "Available datacenters: INGV (default), EMSC, GFZ, USGS, and others supported by ObsPy."
 )
 
 _EVENTID_NOTE = (
