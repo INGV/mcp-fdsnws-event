@@ -325,13 +325,18 @@ def test_our_own_bad_keyword_still_raises_type_error(monkeypatch):
 # hand-built stand-in.
 
 QUAKEML_EVENTS = {
-    "INGV": "37258271",
+    # INGV: Mw 3.5, Moggio Udinese, 2026-03-19. Chosen because it is complete --
+    # 150 arrivals, 6 origins, 6 magnitudes, 575 station magnitudes, 1235 amplitudes,
+    # and a focal mechanism with a moment tensor -- so every by-id tool has real
+    # content to serialize instead of an empty subresource.
+    "INGV": "45376822",
     "EMSC": "20240101_0000328",
     "GFZ": "gfz2024abmz",
     "USGS": "us6000m0yg",
 }
 
-# (fixture variant, tool, fetch function it calls, key holding the item count)
+# (fixture variant, tool, fetch function it calls, key holding the item count).
+# focalmechanism shares the allmagnitudes document because it sends the same flag.
 BYID_TOOLS = [
     ("plain", "fdsn_get_earthquake_by_id", "get_event_by_id", None),
     ("arrivals", "fdsn_get_arrivals_by_id", "get_arrivals_by_id", "arrivals_count"),
@@ -339,6 +344,8 @@ BYID_TOOLS = [
      "magnitudes_count"),
     ("allorigins", "fdsn_get_allorigins_by_id", "get_allorigins_by_id",
      "origins_count"),
+    ("allmagnitudes", "fdsn_get_focalmechanism_by_id", "get_focalmechanism_by_id",
+     "focal_mechanisms_count"),
 ]
 
 # EMSC does not implement includeallmagnitudes and USGS does not implement
@@ -350,6 +357,10 @@ BYID_CASES = [
     for variant, tool, fetch, count_key in BYID_TOOLS
     if (FIXTURES / f"{dc.lower()}_{variant}.quakeml.xml").exists()
 ]
+
+# Test ids name the tool, not the fixture variant, because two tools share a document.
+BYID_IDS = [f"{c[0]}-{c[2].removeprefix('fdsn_get_').removesuffix('_by_id')}"
+            for c in BYID_CASES]
 
 
 def _serve_fixture(monkeypatch, datacenter, variant, fetch_name):
@@ -363,8 +374,7 @@ def _serve_fixture(monkeypatch, datacenter, variant, fetch_name):
 
 
 @pytest.mark.parametrize(
-    "datacenter,variant,tool,fetch,count_key", BYID_CASES,
-    ids=[f"{c[0]}-{c[1]}" for c in BYID_CASES],
+    "datacenter,variant,tool,fetch,count_key", BYID_CASES, ids=BYID_IDS,
 )
 def test_byid_serializes_real_provider_quakeml(
     monkeypatch, datacenter, variant, tool, fetch, count_key
@@ -389,25 +399,52 @@ def test_byid_serializes_real_provider_quakeml(
     assert out["event_id"] == eventid
     assert isinstance(out[count_key], int)
     if out[count_key] == 0:
-        # Three-state contract: the event exists but carries no such subresource,
-        # which must be said rather than returned as an empty payload. Hit by
-        # INGV/arrivals -- a property of event 37258271, not of INGV, which does
-        # implement includearrivals and does publish arrivals for other events.
+        # Three-state contract: the event exists but carries no such subresource, which
+        # must be said rather than returned as an empty payload. Reached where a
+        # provider computes no focal mechanism for the event.
         assert out["message"]
     else:
         # "origins_count" counts "origins", and so on.
         assert out[count_key] == len(out[count_key.removesuffix("_count")])
 
 
+def test_absent_subresource_is_explained_not_returned_empty(monkeypatch):
+    """The three-state contract on a captured document that genuinely has none.
+
+    ``ingv_no_arrivals.quakeml.xml`` is INGV event 37258271, which has no arrivals --
+    a property of that event, not of INGV, which implements ``includearrivals`` and
+    publishes arrivals for others (event 45376822 has 150).
+    """
+    catalog = read_events(str(FIXTURES / "ingv_no_arrivals.quakeml.xml"))
+
+    async def fake(eventid, datacenter="INGV"):
+        return (catalog, "https://example/query")
+
+    monkeypatch.setattr(server, "get_arrivals_by_id", fake)
+    out = json.loads(
+        run(server.fdsn_get_arrivals_by_id(eventid="37258271", datacenter="INGV"))
+    )
+
+    assert out["found"] is True
+    assert out["arrivals_count"] == 0
+    assert out["message"]
+
+
 @pytest.mark.parametrize(
-    "datacenter,variant,parameter",
+    "datacenter,variant,parameter,tool,fetch",
     [
-        ("EMSC", "allmagnitudes", "includeallmagnitudes"),
-        ("USGS", "arrivals", "includearrivals"),
+        ("EMSC", "allmagnitudes", "includeallmagnitudes",
+         "fdsn_get_allmagnitudes_by_id", "get_allmagnitudes_by_id"),
+        # Same refusal reaches a second tool, because focalmechanism sends the same flag.
+        ("EMSC", "allmagnitudes", "includeallmagnitudes",
+         "fdsn_get_focalmechanism_by_id", "get_focalmechanism_by_id"),
+        ("USGS", "arrivals", "includearrivals",
+         "fdsn_get_arrivals_by_id", "get_arrivals_by_id"),
     ],
+    ids=["EMSC-allmagnitudes", "EMSC-focalmechanism", "USGS-arrivals"],
 )
 def test_provider_without_subresource_is_reported_not_crashed(
-    monkeypatch, datacenter, variant, parameter
+    monkeypatch, datacenter, variant, parameter, tool, fetch
 ):
     """The provider's own refusal, captured verbatim, must reach the client in band.
 
@@ -420,10 +457,6 @@ def test_provider_without_subresource_is_reported_not_crashed(
     async def fake(eventid, datacenter="INGV"):
         raise DatacenterError(body, datacenter=datacenter, api_url="https://example/q")
 
-    tool = {"allmagnitudes": "fdsn_get_allmagnitudes_by_id",
-            "arrivals": "fdsn_get_arrivals_by_id"}[variant]
-    fetch = {"allmagnitudes": "get_allmagnitudes_by_id",
-             "arrivals": "get_arrivals_by_id"}[variant]
     monkeypatch.setattr(server, fetch, fake)
 
     out = json.loads(
