@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="US-ASCII" standalone="yes"?>
+<q:quakeml xmlns:q="http://quakeml.org/xmlns/quakeml/1.2" xmlns="http://quakeml.org/xmlns/bed/1.2" xmlns:ingv="http://webservices.ingv.it/">
+  <eventParameters publicID="smi:webservices.ingv.it/fdsnws/event/1/query">
+    <event publicID="smi:webservices.ingv.it/fdsnws/event/1/query?eventId=37258271">
+      <type>earthquake</type>
+      <description>
+        <type>region name</type>
+        <text>Near west coast of eastern Honshu, Japan [Sea: Japan]</text>
+      </description>
+      <preferredMagnitudeID>smi:webservices.ingv.it/fdsnws/event/1/query?magnitudeId=134089631</preferredMagnitudeID>
+      <preferredOriginID>smi:webservices.ingv.it/fdsnws/event/1/query?originId=124418441</preferredOriginID>
+      <creationInfo>
+        <agencyID>INGV</agencyID>
+        <author>early-est_ee1.1.9#ee</author>
+        <creationTime>2024-01-01T07:24:46</creationTime>
+        <ingv:id_locator>1704093527139</ingv:id_locator>
+      </creationInfo>
+      <origin publicID="smi:webservices.ingv.it/fdsnws/event/1/query?originId=124418441">
+        <evaluationMode>manual</evaluationMode>
+        <type>hypocenter</type>
+        <time>
+          <value>2024-01-01T07:18:46.670000</value>
+        </time>
+        <latitude>
+          <value>37.216</value>
+        </latitude>
+        <longitude>
+          <value>136.591</value>
+        </longitude>
+        <depth>
+          <value>19530</value>
+          <uncertainty>15636</uncertainty>
+        </depth>
+        <depthType>from location</depthType>
+        <originUncertainty>
+          <preferredDescription>horizontal uncertainty</preferredDescription>
+          <horizontalUncertainty>14222.0</horizontalUncertainty>
+          <confidenceLevel>68</confidenceLevel>
+        </originUncertainty>
+        <quality>
+          <azimuthalGap>60</azimuthalGap>
+          <associatedPhaseCount>1</associatedPhaseCount>
+          <usedPhaseCount>1</usedPhaseCount>
+          <standardError>1.88</standardError>
+          <associatedStationCount>0</associatedStationCount>
+          <usedStationCount>0</usedStationCount>
+        </quality>
+        <evaluationStatus>reviewed</evaluationStatus>
+        <methodID>smi:webservices.ingv.it/fdsnws/event/1/query?methodId=11</methodID>
+        <earthModelID>smi:webservices.ingv.it/fdsnws/event/1/query?earthModelId=51</earthModelID>
+        <creationInfo>
+          <agencyID>INGV</agencyID>
+          <author>SURVEY-INGV</author>
+          <version>200</version>
+          <creationTime>2024-01-02T10:54:54</creationTime>
+          <ingv:quality></ingv:quality>
+          <ingv:doi>https://doi.org/10.13127/ISIDE</ingv:doi>
+        </creationInfo>
+      </origin>
+      <magnitude publicID="smi:webservices.ingv.it/fdsnws/event/1/query?magnitudeId=134062241">
+        <stationCount>2</stationCount>
+        <originID>smi:webservices.ingv.it/fdsnws/event/1/query?originId=124395181</originID>
+        <type>Mwpd</type>
+        <mag>
+          <value>7.3</value>
+          <uncertainty>0.0</uncertainty>
+        </mag>
+        <methodID>smi:webservices.ingv.it/fdsnws/event/1/query?methodId=141</methodID>
+        <creationInfo>
+          <agencyID>INGV</agencyID>
+          <author>early-est_ee1.1.9#ee</author>
+          <creationTime>2024-01-01T08:23:41</creationTime>
+          <ingv:mag_quality></ingv:mag_quality>
+        </creationInfo>
+        <comment>
+          <text>Auto added</text>
+        </comment>
+      </magnitude>
+      <magnitude publicID="smi:webservices.ingv.it/fdsnws/event/1/query?magnitudeId=134057261">
+        <stationCount>2</stationCount>
+        <originID>smi:webservices.ingv.it/fdsnws/event/1/query?originId=124392581</originID>
+        <type>Mwpd</type>
+        <mag>
+          <value>7.3</value>
+          <uncertainty>0.0</uncertainty>
+        </mag>
+        <methodID>smi:webservices.ingv.it/fdsnws/event/1/query?methodId=141</methodID>
+        <creationInfo>
+          <agencyID>INGV</agencyID>
+          <author>early-est_ee1.1.9#ee</author>
+          <creationTime>2024-01-01T07:32:00</creationTime>
+          <ingv:mag_quality></ingv:mag_quality>
+        </creationInfo>
+        <comment>
+          <text>Auto added</text>
+        </comment>
+      </magnitude>
+      <magnitude publicID="smi:webservices.ingv.it/fdsnws/event/1/query?magnitudeId=134062231">
+        <stationCount>2</stationCount>
+        <originID>smi:webservices.ingv.it/fdsnws/event/1/query?originId=124395181</originID>
+        <type>Mwp</type>
+        <mag>
+          <value>6.1</value>
+          <uncertainty>1.2</uncertainty>
+        </mag>
+        <methodID>smi:webservices.ingv.it/fdsnws/event/1/query?methodId=141</methodID>
+        <creationInfo>
+          <agencyID>INGV</agencyID>
+          <author>early-est_ee1.1.9#ee</author>
+          <creationTime>2024-01-01T08:23:41</creationTime>
+          <ingv:mag_quality></ingv:mag_quality>
+        </creationInfo>
+        <comment>
+          <text>Auto added</text>
+        </comment>
+      </magnitude>
+      <magnitude publicID="smi:webservices.ingv.it/fdsnws/event/1/query?magnitudeId=134057251">
+        <stationCount>2</stationCount>
+        <originID>smi:webservices.ingv.it/fdsnws/event/1/query?originId=124392581</originID>
+        <type>Mwp</type>
+        <mag>
+          <value>6.1</value>
+          <uncertainty>1.2</uncertainty>
+        </mag>
+        <methodID>smi:webservices.ingv.it/fdsnws/event/1/query?methodId=141</methodID>
+        <creationInfo>
+          <agencyID>INGV</agencyID>
+          <author>early-est_ee1.1.9#ee</author>
+          <creationTime>2024-01-01T07:32:00</creationTime>
+          <ingv:mag_quality></ingv:mag_quality>
+        </creationInfo>
+        <comment>
+          <text>Auto added</text>
+        </comment>
+      </magnitude>
+      <magnitude publicID="smi:webservices.ingv.it/fdsnws/event/1/query?magnitudeId=134089631">
+        <originID>smi:webservices.ingv.it/fdsnws/event/1/query?originId=124418441</originID>
+        <type>Mwp</type>
+        <mag>
+          <value>6.1</value>
+          <uncertainty>0.3</uncertainty>
+        </mag>
+        <methodID>smi:webservices.ingv.it/fdsnws/event/1/query?methodId=11</methodID>
+        <creationInfo>
+          <agencyID>INGV</agencyID>
+          <author>SURVEY-INGV</author>
+          <creationTime>2024-01-02T10:54:54</creationTime>
+          <ingv:mag_quality></ingv:mag_quality>
+        </creationInfo>
+        <comment>
+          <text>Auto added</text>
+        </comment>
+      </magnitude>
+      <magnitude publicID="smi:webservices.ingv.it/fdsnws/event/1/query?magnitudeId=134057241">
+        <stationCount>26</stationCount>
+        <originID>smi:webservices.ingv.it/fdsnws/event/1/query?originId=124392581</originID>
+        <type>mb</type>
+        <mag>
+          <value>5.5</value>
+          <uncertainty>0.1</uncertainty>
+        </mag>
+        <methodID>smi:webservices.ingv.it/fdsnws/event/1/query?methodId=141</methodID>
+        <creationInfo>
+          <agencyID>INGV</agencyID>
+          <author>early-est_ee1.1.9#ee</author>
+          <creationTime>2024-01-01T07:32:00</creationTime>
+          <ingv:mag_quality></ingv:mag_quality>
+        </creationInfo>
+        <comment>
+          <text>Body wave magnitude</text>
+        </comment>
+      </magnitude>
+      <magnitude publicID="smi:webservices.ingv.it/fdsnws/event/1/query?magnitudeId=134056991">
+        <stationCount>6</stationCount>
+        <originID>smi:webservices.ingv.it/fdsnws/event/1/query?originId=124392451</originID>
+        <type>mb</type>
+        <mag>
+          <value>5.6</value>
+          <uncertainty>0.1</uncertainty>
+        </mag>
+        <methodID>smi:webservices.ingv.it/fdsnws/event/1/query?methodId=141</methodID>
+        <creationInfo>
+          <agencyID>INGV</agencyID>
+          <author>early-est_ee1.1.9#ee</author>
+          <creationTime>2024-01-01T07:28:08</creationTime>
+          <ingv:mag_quality></ingv:mag_quality>
+        </creationInfo>
+        <comment>
+          <text>Body wave magnitude</text>
+        </comment>
+      </magnitude>
+      <magnitude publicID="smi:webservices.ingv.it/fdsnws/event/1/query?magnitudeId=134056581">
+        <stationCount>3</stationCount>
+        <originID>smi:webservices.ingv.it/fdsnws/event/1/query?originId=124392281</originID>
+        <type>mb</type>
+        <mag>
+          <value>5.5</value>
+          <uncertainty>0.0</uncertainty>
+        </mag>
+        <methodID>smi:webservices.ingv.it/fdsnws/event/1/query?methodId=141</methodID>
+        <creationInfo>
+          <agencyID>INGV</agencyID>
+          <author>early-est_ee1.1.9#ee</author>
+          <creationTime>2024-01-01T07:24:46</creationTime>
+          <ingv:mag_quality></ingv:mag_quality>
+        </creationInfo>
+        <comment>
+          <text>Body wave magnitude</text>
+        </comment>
+      </magnitude>
+      <magnitude publicID="smi:webservices.ingv.it/fdsnws/event/1/query?magnitudeId=134062221">
+        <stationCount>26</stationCount>
+        <originID>smi:webservices.ingv.it/fdsnws/event/1/query?originId=124395181</originID>
+        <type>mb</type>
+        <mag>
+          <value>5.5</value>
+          <uncertainty>0.1</uncertainty>
+        </mag>
+        <methodID>smi:webservices.ingv.it/fdsnws/event/1/query?methodId=141</methodID>
+        <creationInfo>
+          <agencyID>INGV</agencyID>
+          <author>early-est_ee1.1.9#ee</author>
+          <creationTime>2024-01-01T08:23:41</creationTime>
+          <ingv:mag_quality></ingv:mag_quality>
+        </creationInfo>
+        <comment>
+          <text>Body wave magnitude</text>
+        </comment>
+      </magnitude>
+    </event>
+  </eventParameters>
+</q:quakeml>

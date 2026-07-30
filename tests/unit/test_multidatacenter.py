@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 
 import pytest
+from obspy import read_events
 from obspy.core.event import Catalog, Event
 from obspy.core.event.base import ResourceIdentifier
 from pydantic import ValidationError
@@ -312,3 +313,124 @@ def test_our_own_bad_keyword_still_raises_type_error(monkeypatch):
 
     with pytest.raises(TypeError):
         run(oc._get_events_quakeml("37258271", "INGV", not_a_real_kwarg=True))
+
+
+# --- By-id contracts driven by real provider QuakeML -----------------------------
+#
+# The fixtures above cover the search path. These cover the by-id path from captured
+# QuakeML, one document per provider and per include-flag set, so the whole
+# tool-by-provider matrix stays reproducible while the services are unreachable.
+# Parsing goes through ObsPy exactly as in production, which is the point: what is
+# under test is our serialization of each provider's real event structure, not a
+# hand-built stand-in.
+
+QUAKEML_EVENTS = {
+    "INGV": "37258271",
+    "EMSC": "20240101_0000328",
+    "GFZ": "gfz2024abmz",
+    "USGS": "us6000m0yg",
+}
+
+# (fixture variant, tool, fetch function it calls, key holding the item count)
+BYID_TOOLS = [
+    ("plain", "fdsn_get_earthquake_by_id", "get_event_by_id", None),
+    ("arrivals", "fdsn_get_arrivals_by_id", "get_arrivals_by_id", "arrivals_count"),
+    ("allmagnitudes", "fdsn_get_allmagnitudes_by_id", "get_allmagnitudes_by_id",
+     "magnitudes_count"),
+    ("allorigins", "fdsn_get_allorigins_by_id", "get_allorigins_by_id",
+     "origins_count"),
+]
+
+# EMSC does not implement includeallmagnitudes and USGS does not implement
+# includearrivals, so no document exists to capture; those two cells are covered by
+# the captured error bodies below instead.
+BYID_CASES = [
+    (dc, variant, tool, fetch, count_key)
+    for dc in QUAKEML_EVENTS
+    for variant, tool, fetch, count_key in BYID_TOOLS
+    if (FIXTURES / f"{dc.lower()}_{variant}.quakeml.xml").exists()
+]
+
+
+def _serve_fixture(monkeypatch, datacenter, variant, fetch_name):
+    """Make the tool's fetch function return the captured document for this cell."""
+    catalog = read_events(str(FIXTURES / f"{datacenter.lower()}_{variant}.quakeml.xml"))
+
+    async def fake(eventid, datacenter="INGV"):
+        return (catalog, f"https://example/query?eventid={eventid}")
+
+    monkeypatch.setattr(server, fetch_name, fake)
+
+
+@pytest.mark.parametrize(
+    "datacenter,variant,tool,fetch,count_key", BYID_CASES,
+    ids=[f"{c[0]}-{c[1]}" for c in BYID_CASES],
+)
+def test_byid_serializes_real_provider_quakeml(
+    monkeypatch, datacenter, variant, tool, fetch, count_key
+):
+    _serve_fixture(monkeypatch, datacenter, variant, fetch)
+    eventid = QUAKEML_EVENTS[datacenter]
+
+    out = json.loads(
+        run(getattr(server, tool)(eventid=eventid, datacenter=datacenter))
+    )
+
+    assert out["found"] is True
+    assert out["datacenter"] == datacenter
+
+    if count_key is None:
+        # fdsn_get_earthquake_by_id reports the event itself, with no count.
+        assert out["event"]
+        return
+
+    # The identifier must survive the round trip through the provider's own
+    # resource_id form -- the shape that used to be mis-parsed for USGS.
+    assert out["event_id"] == eventid
+    assert isinstance(out[count_key], int)
+    if out[count_key] == 0:
+        # Three-state contract: the event exists but this provider published no such
+        # subresource for it, which must be said rather than returned as an empty
+        # payload. INGV genuinely publishes no arrivals for this event.
+        assert out["message"]
+    else:
+        # "origins_count" counts "origins", and so on.
+        assert out[count_key] == len(out[count_key.removesuffix("_count")])
+
+
+@pytest.mark.parametrize(
+    "datacenter,variant,parameter",
+    [
+        ("EMSC", "allmagnitudes", "includeallmagnitudes"),
+        ("USGS", "arrivals", "includearrivals"),
+    ],
+)
+def test_provider_without_subresource_is_reported_not_crashed(
+    monkeypatch, datacenter, variant, parameter
+):
+    """The provider's own refusal, captured verbatim, must reach the client in band.
+
+    EMSC answers 400 and USGS 501; ObsPy turns the first into a TypeError of its own
+    before any request leaves. Either way the tool must return the error payload.
+    """
+    body = (FIXTURES / f"{datacenter.lower()}_{variant}.error.txt").read_text()
+    assert parameter in body, "captured fixture no longer names the parameter"
+
+    async def fake(eventid, datacenter="INGV"):
+        raise DatacenterError(body, datacenter=datacenter, api_url="https://example/q")
+
+    tool = {"allmagnitudes": "fdsn_get_allmagnitudes_by_id",
+            "arrivals": "fdsn_get_arrivals_by_id"}[variant]
+    fetch = {"allmagnitudes": "get_allmagnitudes_by_id",
+             "arrivals": "get_arrivals_by_id"}[variant]
+    monkeypatch.setattr(server, fetch, fake)
+
+    out = json.loads(
+        run(getattr(server, tool)(
+            eventid=QUAKEML_EVENTS[datacenter], datacenter=datacenter
+        ))
+    )
+
+    assert out["error"] is True
+    assert out["datacenter"] == datacenter
+    assert parameter in out["message"]

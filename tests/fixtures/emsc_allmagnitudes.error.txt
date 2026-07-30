@@ -1,0 +1,10 @@
+Error 400: Request was not properly specified: the includeallmagnitudes parameter is not implemented by this server.
+
+Request:
+http://ws2/query?eventid=20240101_0000328&includeallmagnitudes=true&format=xml
+
+Request Submitted:
+2026-07-30T11:42:46.126
+
+Service version: v 2.2
+fdsnws-event: v 1.2.1

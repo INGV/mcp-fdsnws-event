@@ -68,6 +68,25 @@ identifiers. Both are why parsing is header-driven and why `eventid` is a string
 IRIS/EarthScope is deliberately absent: its FDSNWS **event** service returns
 HTTP 410, so there is nothing to capture.
 
+The `*.quakeml.xml` files do the same for the **by-id** path: one captured QuakeML
+document per provider and per include-flag set (`plain`, `arrivals`,
+`allmagnitudes`, `allorigins`), parsed through ObsPy exactly as in production. What
+they test is our serialization of each provider's real event structure, so the
+by-id half of the matrix also survives an outage.
+
+Two of the sixteen combinations have no document to capture, because the provider
+does not implement the flag: EMSC refuses `includeallmagnitudes` (HTTP 400) and
+USGS refuses `includearrivals` (HTTP 501). Their responses are captured verbatim as
+`*.error.txt` and asserted instead, which is what pins those two cells.
+
+INGV publishes no arrivals for its event, so `ingv_arrivals.quakeml.xml` is the case
+where the three-state contract fires: event found, subresource absent, explained in
+`message` rather than returned as an empty payload.
+
+The EMSC arrivals document is ~580 kB. That is deliberate: it is a real event with
+316 arrivals, and picking a smaller one would drop the only fixture that exercises a
+large nested payload.
+
 ## Conventions
 
 - Unit tests must not touch the network — mock `requests.get` (see
