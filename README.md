@@ -7,12 +7,12 @@
 # FDSNWS Event MCP Server
 
 An MCP (Model Context Protocol) server for querying the FDSN Web Service Event APIs of
-multiple seismological datacenters (INGV, IRIS, EMSC, GFZ, etc.) and retrieving
+multiple seismological datacenters (INGV, EMSC, GFZ, USGS, etc.) and retrieving
 earthquake information as JSON.
 
 ## Features
 
-- **Multi-datacenter**: works with any FDSN-compliant datacenter (INGV, IRIS, EMSC, GFZ, and others)
+- **Multi-datacenter**: works with any FDSN-compliant datacenter (INGV, EMSC, GFZ, USGS, and others)
 - **6 MCP tools**: event search, single-event detail, arrivals, magnitudes, origins, focal mechanisms
 - **Two output levels**: a compact tabular search result (from FDSN `format=text`) and a full
   QuakeML→JSON detail for a single event (the `*_by_id` tools)
@@ -92,8 +92,14 @@ recommended way to validate all functionality.
 ### Available tools
 
 The server exposes 6 tools. They all accept an optional `datacenter` parameter
-(default: `"INGV"`). Supported datacenters: INGV, IRIS, EMSC, GFZ, and other
+(default: `"INGV"`). Supported datacenters: INGV, EMSC, GFZ, USGS, and other
 FDSN-compliant services.
+
+> **Note on IRIS.** IRIS/EarthScope no longer serves the FDSNWS *event* service:
+> both `service.iris.edu` and `service.earthscope.org` answer
+> `/fdsnws/event/1/query` with **HTTP 410 Gone**. It is therefore no longer
+> advertised here; USGS is the recommended global substitute. Station and
+> waveform services at EarthScope are unaffected (this server does not use them).
 
 #### 1. `fdsn_query_earthquakes`
 
@@ -133,8 +139,8 @@ use the `*_by_id` tools (complete QuakeML, depth in meters).
 // Radial search (50 km around Rome)
 {"latitude": 41.9, "longitude": 12.5, "maxradiuskm": 50}
 
-// Query IRIS instead of INGV
-{"minmag": 5.0, "starttime": "2025-01-01T00:00:00", "datacenter": "IRIS"}
+// Query USGS instead of INGV
+{"minmag": 5.0, "starttime": "2025-01-01T00:00:00", "datacenter": "USGS"}
 ```
 
 #### 2. `fdsn_get_earthquake_by_id`
@@ -254,9 +260,9 @@ Test details and conventions in [`tests/README.md`](tests/README.md).
 
 The server queries any FDSN-compliant datacenter:
 - **INGV** (default): `https://webservices.ingv.it/fdsnws/event/1/query`
-- **IRIS**: `https://service.iris.edu/fdsnws/event/1/query`
 - **EMSC**: `https://www.seismicportal.eu/fdsnws/event/1/query`
-- **GFZ**: `https://geofon.gfz-potsdam.de/fdsnws/event/1/query`
+- **GFZ**: `https://geofon.gfz.de/fdsnws/event/1/query`
+- **USGS**: `https://earthquake.usgs.gov/fdsnws/event/1/query`
 - **Format**: search via `format=text` (tabular); detail via QuakeML (XML) → JSON
 - **Documentation**: [FDSNWS Event API](https://www.fdsn.org/webservices/fdsnws-event-1.1.pdf)
 

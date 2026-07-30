@@ -11,6 +11,7 @@ from mcp.types import ToolAnnotations
 from pydantic import ValidationError
 
 from .models import (
+    EventIdInput,
     GetAllMagnitudesByIdInput,
     GetAllOriginsByIdInput,
     GetArrivalsByIdInput,
@@ -44,12 +45,13 @@ _QUERY_ANNOTATIONS = ToolAnnotations(
 )
 
 _DATACENTER_NOTE = (
-    "Available datacenters: INGV (default), IRIS, EMSC, GFZ, and others supported by ObsPy."
+    "Available datacenters: INGV (default), EMSC, GFZ, USGS, and others supported by ObsPy."
 )
 
 _EVENTID_NOTE = (
-    "The eventid MUST be taken from a prior fdsn_query_earthquakes result "
-    "(EventID column). Never invent, guess, or use placeholder values.\n\n"
+    "The eventid is an opaque, provider-specific string and MUST be copied verbatim "
+    "from a prior fdsn_query_earthquakes result (EventID column). Never invent, guess, "
+    "reformat, or use placeholder values.\n\n"
 )
 
 
@@ -61,7 +63,7 @@ def _error_payload(e: DatacenterError) -> str:
     )
 
 
-def _not_found_payload(datacenter: str, api_url: str, eventid: int, **empty_fields) -> str:
+def _not_found_payload(datacenter: str, api_url: str, eventid: str, **empty_fields) -> str:
     """Render the 'event not found' state (empty catalog) with an actionable message.
 
     ``empty_fields`` carries the tool-specific empty result keys (e.g.
@@ -216,7 +218,7 @@ async def fdsn_query_earthquakes(
     ),
     annotations=_QUERY_ANNOTATIONS,
 )
-async def fdsn_get_earthquake_by_id(eventid: int, datacenter: str = "INGV") -> str:
+async def fdsn_get_earthquake_by_id(eventid: EventIdInput, datacenter: str = "INGV") -> str:
     try:
         params = GetEarthquakeByIdInput(eventid=eventid, datacenter=datacenter)
     except ValidationError as e:
@@ -253,7 +255,7 @@ async def fdsn_get_earthquake_by_id(eventid: int, datacenter: str = "INGV") -> s
     ),
     annotations=_QUERY_ANNOTATIONS,
 )
-async def fdsn_get_arrivals_by_id(eventid: int, datacenter: str = "INGV") -> str:
+async def fdsn_get_arrivals_by_id(eventid: EventIdInput, datacenter: str = "INGV") -> str:
     try:
         params = GetArrivalsByIdInput(eventid=eventid, datacenter=datacenter)
     except ValidationError as e:
@@ -301,7 +303,7 @@ async def fdsn_get_arrivals_by_id(eventid: int, datacenter: str = "INGV") -> str
     ),
     annotations=_QUERY_ANNOTATIONS,
 )
-async def fdsn_get_allmagnitudes_by_id(eventid: int, datacenter: str = "INGV") -> str:
+async def fdsn_get_allmagnitudes_by_id(eventid: EventIdInput, datacenter: str = "INGV") -> str:
     try:
         params = GetAllMagnitudesByIdInput(eventid=eventid, datacenter=datacenter)
     except ValidationError as e:
@@ -346,7 +348,7 @@ async def fdsn_get_allmagnitudes_by_id(eventid: int, datacenter: str = "INGV") -
     ),
     annotations=_QUERY_ANNOTATIONS,
 )
-async def fdsn_get_allorigins_by_id(eventid: int, datacenter: str = "INGV") -> str:
+async def fdsn_get_allorigins_by_id(eventid: EventIdInput, datacenter: str = "INGV") -> str:
     try:
         params = GetAllOriginsByIdInput(eventid=eventid, datacenter=datacenter)
     except ValidationError as e:
@@ -392,7 +394,7 @@ async def fdsn_get_allorigins_by_id(eventid: int, datacenter: str = "INGV") -> s
     ),
     annotations=_QUERY_ANNOTATIONS,
 )
-async def fdsn_get_focalmechanism_by_id(eventid: int, datacenter: str = "INGV") -> str:
+async def fdsn_get_focalmechanism_by_id(eventid: EventIdInput, datacenter: str = "INGV") -> str:
     try:
         params = GetFocalMechanismByIdInput(eventid=eventid, datacenter=datacenter)
     except ValidationError as e:

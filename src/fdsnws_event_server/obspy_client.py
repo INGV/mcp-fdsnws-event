@@ -225,14 +225,30 @@ def event_to_full_dict(event) -> dict:
 
 
 def _extract_event_id(event) -> str:
-    """Extract numeric event ID from an ObsPy Event resource_id."""
+    """Extract the provider's event ID from an ObsPy Event resource_id.
+
+    QuakeML resource identifiers are free-form URIs and every datacenter spells them
+    differently. The four shapes observed in practice:
+
+        INGV  smi:webservices.ingv.it/fdsnws/event/1/query?eventId=37258271
+        USGS  quakeml:earthquake.usgs.gov/fdsnws/event/1/query?eventid=us6000m0yg&format=quakeml
+        GFZ   smi:org.gfz-potsdam.de/geofon/gfz2024abmz
+        EMSC  quakeml:eu.emsc/event/20240101_0000328
+
+    So: take the id from an ``eventid`` query parameter when there is one, matching
+    the name case-insensitively and the value as an opaque token -- the previous
+    ``eventId=(\\d+)`` pattern was INGV-specific on both counts, and on USGS it missed
+    and let the fallback return the whole query string. Otherwise fall back to the
+    last path segment, with the query string stripped first so it cannot leak in.
+    """
     rid = str(event.resource_id)
-    # resource_id may be "smi:...fdsnws/event/1/query?eventId=12345"
-    m = re.search(r"eventId=(\d+)", rid)
-    return m.group(1) if m else rid.split("/")[-1]
+    m = re.search(r"[?&]eventid=([^&#]+)", rid, re.IGNORECASE)
+    if m:
+        return m.group(1)
+    return rid.split("?", 1)[0].rstrip("/").split("/")[-1]
 
 
-async def _get_events_quakeml(eventid: int, datacenter: str, **extra) -> tuple[Catalog, str]:
+async def _get_events_quakeml(eventid: str, datacenter: str, **extra) -> tuple[Catalog, str]:
     """Shared QuakeML fetch by event id for the detail tools.
 
     Raises DatacenterError on upstream HTTP/network failure; HTTP 204 returns an
@@ -255,29 +271,29 @@ async def _get_events_quakeml(eventid: int, datacenter: str, **extra) -> tuple[C
     return (catalog, api_url)
 
 
-async def get_event_by_id(eventid: int, datacenter: str = "INGV") -> tuple[Catalog, str]:
+async def get_event_by_id(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
     """Fetch a single event by ID (basic info: preferred origin/magnitude, station
     magnitudes, amplitudes). Alternative origins/magnitudes/arrivals need the
     specialized tools."""
     return await _get_events_quakeml(eventid, datacenter)
 
 
-async def get_arrivals_by_id(eventid: int, datacenter: str = "INGV") -> tuple[Catalog, str]:
+async def get_arrivals_by_id(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
     """Fetch a single event with all arrivals and picks."""
     return await _get_events_quakeml(eventid, datacenter, includearrivals=True)
 
 
-async def get_allmagnitudes_by_id(eventid: int, datacenter: str = "INGV") -> tuple[Catalog, str]:
+async def get_allmagnitudes_by_id(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
     """Fetch a single event with all magnitude solutions."""
     return await _get_events_quakeml(eventid, datacenter, includeallmagnitudes=True)
 
 
-async def get_allorigins_by_id(eventid: int, datacenter: str = "INGV") -> tuple[Catalog, str]:
+async def get_allorigins_by_id(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
     """Fetch a single event with all origin solutions."""
     return await _get_events_quakeml(eventid, datacenter, includeallorigins=True)
 
 
-async def get_focalmechanism_by_id(eventid: int, datacenter: str = "INGV") -> tuple[Catalog, str]:
+async def get_focalmechanism_by_id(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
     """Fetch a single event with focal mechanism data.
 
     Uses includeallmagnitudes=True because moment tensors are linked to magnitudes.

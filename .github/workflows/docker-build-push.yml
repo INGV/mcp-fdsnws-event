@@ -4,11 +4,16 @@ on:
   push:
     branches:
       - main
+      - develop
     tags:
       - 'v*.*.*'
   pull_request:
+    # develop is the integration branch, so a PR targeting it must be built too;
+    # previously only PRs into main were, leaving develop PRs entirely unvalidated.
+    # Pull-request builds never push (see the `push:` conditions below).
     branches:
       - main
+      - develop
 
 env:
   DOCKER_IMAGE: ingv/mcp-fdsnws-event
