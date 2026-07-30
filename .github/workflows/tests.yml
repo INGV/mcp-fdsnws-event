@@ -1,0 +1,67 @@
+name: Tests
+
+# The offline suite is safe to run anywhere: pytest defaults to
+# `-m 'not integration'` (pyproject.toml), so no job here touches an FDSN
+# datacenter. Live tests stay opt-in and are never run in CI, to avoid putting
+# load on third-party services on every push.
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor declared in pyproject.toml, plus the versions it must keep
+        # working on. Keep this list and `requires-python` in sync.
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies for ObsPy
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y gcc gfortran libblas-dev liblapack-dev
+
+      # constraints.txt is generated on 3.11 (see its header), so it is applied
+      # only there. The other versions resolve freely and act as an early warning
+      # that the declared ranges still hold on newer interpreters.
+      - name: Install package (3.11, constrained)
+        if: matrix.python-version == '3.11'
+        run: pip install -c constraints.txt -e ".[dev]"
+
+      - name: Install package (unconstrained)
+        if: matrix.python-version != '3.11'
+        run: pip install -e ".[dev]"
+
+      - name: Run offline test suite
+        run: pytest -q
+
+      # Mirrors step 4 of run_tests.sh, without Docker. Output is captured rather
+      # than piped into `grep -q`, which would close the pipe early and trip
+      # pipefail on a SIGPIPE instead of reporting the real result.
+      - name: MCP protocol smoke test (tools/list)
+        run: |
+          set -euo pipefail
+          OUT=$(printf '%s\n' \
+            '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "ci", "version": "1.0.0"}}}' \
+            '{"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}}' \
+            '{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}' \
+            | python -m fdsnws_event_server.server)
+          echo "${OUT}"
+          echo "${OUT}" | grep -F '"tools"' > /dev/null
