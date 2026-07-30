@@ -12,14 +12,16 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
-COPY pyproject.toml .
+COPY pyproject.toml constraints.txt ./
 
 # Copy source code and tests
 COPY src/ src/
 COPY tests/ tests/
 
-# Install Python dependencies (including dev extras for pytest)
-RUN pip install --no-cache-dir -e ".[dev]"
+# Install Python dependencies (including dev extras for pytest). The constraints
+# file pins the whole transitive set, so an image rebuilt months from now resolves
+# to the versions this release was tested against.
+RUN pip install --no-cache-dir -c constraints.txt -e ".[dev]"
 
 # Create a non-root user
 RUN useradd -m -u 1000 mcp && chown -R mcp:mcp /app
