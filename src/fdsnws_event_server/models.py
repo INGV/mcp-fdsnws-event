@@ -1,9 +1,76 @@
 """Pydantic input models for FDSNWS Event MCP tools."""
 
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
+
+# FDSN event identifiers are opaque, provider-defined strings, not numbers. Only
+# some providers happen to use decimal digits:
+#
+#   INGV  37258271           IRIS/EarthScope  (event service retired, HTTP 410)
+#   EMSC  20240101_0000328   GFZ  gfz2024abmz        USGS  us6000m0yg
+#
+# Typing this field as `int` was therefore wrong in two distinct ways: it rejected
+# GFZ and USGS identifiers outright, and it *silently corrupted* EMSC's, because
+# Python reads the underscore in "20240101_0000328" as a digit separator and yields
+# 202401010000328 -- a different, non-existent event, which the datacenter then
+# answers with HTTP 204 and the server reports as a confident "event not found".
+_EVENTID_PATTERN = r"^[A-Za-z0-9_.:-]+$"
+
+
+def _coerce_eventid(value: object) -> object:
+    """Accept a JSON number for an event id and hand on its digits as a string.
+
+    Kept for backward compatibility: the pre-1.4 schema advertised `eventid` as an
+    integer, so existing clients (and models primed by that schema) still emit one.
+    Pydantic v2 does not coerce int to str on its own, so without this the change
+    from `int` to `str` would break every such caller.
+
+    Only int is converted, never a str: re-parsing a string through `int` is exactly
+    the EMSC-corrupting step described above. A JSON number can never carry an
+    underscore, so this direction is lossless.
+    """
+    if isinstance(value, bool):
+        return value  # let str validation reject it, rather than yielding "True"
+    if isinstance(value, int):
+        return str(value)
+    return value
+
+
+_EVENTID_DESCRIPTION = (
+    "FDSN event ID, as an opaque string. Identifier formats are provider-specific "
+    "(e.g. INGV '37258271', EMSC '20240101_0000328', GFZ 'gfz2024abmz', "
+    "USGS 'us6000m0yg'), so copy the value VERBATIM from the EventID column of a "
+    "prior fdsn_query_earthquakes result. Do NOT invent, guess, reformat, strip "
+    "characters from, or use placeholder values."
+)
+
+# Shared definition so the five by-id models cannot drift apart. The pattern also
+# keeps the value safe to interpolate into an upstream query string.
+EventId = Annotated[
+    str,
+    BeforeValidator(_coerce_eventid),
+    Field(
+        min_length=1,
+        max_length=64,
+        pattern=_EVENTID_PATTERN,
+        description=_EVENTID_DESCRIPTION,
+    ),
+]
+
+# What the MCP tool signatures accept, before EventId normalizes it. Declaring the
+# union (rather than plain str) keeps the generated JSON schema tolerant of the
+# integer that the old schema taught clients to send. Pydantic's smart union leaves
+# a string as a string, so an EMSC identifier is never routed through int.
+EventIdInput = Union[int, str]
 
 
 class QueryEarthquakesInput(BaseModel):
@@ -153,14 +220,7 @@ class GetEarthquakeByIdInput(BaseModel):
         extra="forbid",
     )
 
-    eventid: int = Field(
-        ...,
-        gt=0,
-        description=(
-            "Numeric FDSN event ID. MUST be taken from the EventID column of a prior "
-            "fdsn_query_earthquakes result. Do NOT invent, guess, or use placeholder values."
-        ),
-    )
+    eventid: EventId
     datacenter: str = Field(
         default="INGV",
         description="FDSN datacenter to query (e.g., INGV, IRIS, EMSC, GFZ)",
@@ -173,14 +233,7 @@ class GetArrivalsByIdInput(BaseModel):
         extra="forbid",
     )
 
-    eventid: int = Field(
-        ...,
-        gt=0,
-        description=(
-            "Numeric FDSN event ID. MUST be taken from the EventID column of a prior "
-            "fdsn_query_earthquakes result. Do NOT invent, guess, or use placeholder values."
-        ),
-    )
+    eventid: EventId
     datacenter: str = Field(
         default="INGV",
         description="FDSN datacenter to query (e.g., INGV, IRIS, EMSC, GFZ)",
@@ -193,14 +246,7 @@ class GetAllOriginsByIdInput(BaseModel):
         extra="forbid",
     )
 
-    eventid: int = Field(
-        ...,
-        gt=0,
-        description=(
-            "Numeric FDSN event ID. MUST be taken from the EventID column of a prior "
-            "fdsn_query_earthquakes result. Do NOT invent, guess, or use placeholder values."
-        ),
-    )
+    eventid: EventId
     datacenter: str = Field(
         default="INGV",
         description="FDSN datacenter to query (e.g., INGV, IRIS, EMSC, GFZ)",
@@ -213,14 +259,7 @@ class GetAllMagnitudesByIdInput(BaseModel):
         extra="forbid",
     )
 
-    eventid: int = Field(
-        ...,
-        gt=0,
-        description=(
-            "Numeric FDSN event ID. MUST be taken from the EventID column of a prior "
-            "fdsn_query_earthquakes result. Do NOT invent, guess, or use placeholder values."
-        ),
-    )
+    eventid: EventId
     datacenter: str = Field(
         default="INGV",
         description="FDSN datacenter to query (e.g., INGV, IRIS, EMSC, GFZ)",
@@ -233,14 +272,7 @@ class GetFocalMechanismByIdInput(BaseModel):
         extra="forbid",
     )
 
-    eventid: int = Field(
-        ...,
-        gt=0,
-        description=(
-            "Numeric FDSN event ID. MUST be taken from the EventID column of a prior "
-            "fdsn_query_earthquakes result. Do NOT invent, guess, or use placeholder values."
-        ),
-    )
+    eventid: EventId
     datacenter: str = Field(
         default="INGV",
         description="FDSN datacenter to query (e.g., INGV, IRIS, EMSC, GFZ)",

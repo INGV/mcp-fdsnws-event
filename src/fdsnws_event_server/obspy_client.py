@@ -232,7 +232,7 @@ def _extract_event_id(event) -> str:
     return m.group(1) if m else rid.split("/")[-1]
 
 
-async def _get_events_quakeml(eventid: int, datacenter: str, **extra) -> tuple[Catalog, str]:
+async def _get_events_quakeml(eventid: str, datacenter: str, **extra) -> tuple[Catalog, str]:
     """Shared QuakeML fetch by event id for the detail tools.
 
     Raises DatacenterError on upstream HTTP/network failure; HTTP 204 returns an
@@ -255,29 +255,29 @@ async def _get_events_quakeml(eventid: int, datacenter: str, **extra) -> tuple[C
     return (catalog, api_url)
 
 
-async def get_event_by_id(eventid: int, datacenter: str = "INGV") -> tuple[Catalog, str]:
+async def get_event_by_id(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
     """Fetch a single event by ID (basic info: preferred origin/magnitude, station
     magnitudes, amplitudes). Alternative origins/magnitudes/arrivals need the
     specialized tools."""
     return await _get_events_quakeml(eventid, datacenter)
 
 
-async def get_arrivals_by_id(eventid: int, datacenter: str = "INGV") -> tuple[Catalog, str]:
+async def get_arrivals_by_id(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
     """Fetch a single event with all arrivals and picks."""
     return await _get_events_quakeml(eventid, datacenter, includearrivals=True)
 
 
-async def get_allmagnitudes_by_id(eventid: int, datacenter: str = "INGV") -> tuple[Catalog, str]:
+async def get_allmagnitudes_by_id(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
     """Fetch a single event with all magnitude solutions."""
     return await _get_events_quakeml(eventid, datacenter, includeallmagnitudes=True)
 
 
-async def get_allorigins_by_id(eventid: int, datacenter: str = "INGV") -> tuple[Catalog, str]:
+async def get_allorigins_by_id(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
     """Fetch a single event with all origin solutions."""
     return await _get_events_quakeml(eventid, datacenter, includeallorigins=True)
 
 
-async def get_focalmechanism_by_id(eventid: int, datacenter: str = "INGV") -> tuple[Catalog, str]:
+async def get_focalmechanism_by_id(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
     """Fetch a single event with focal mechanism data.
 
     Uses includeallmagnitudes=True because moment tensors are linked to magnitudes.
