@@ -1,5 +1,8 @@
 # Release Notes
 
+### Release 1.7.0-dev (2026-07-30)
+  - . . .
+
 ### Release 1.6.0 (2026-07-30)
   - fix: report a provider that does not implement a requested `include*` flag through the structured error contract instead of crashing. ObsPy rejects such a flag from the provider's own service description by raising a bare `TypeError` before any request is issued, which escaped the by-id tools unhandled; EMSC does not implement `includeallmagnitudes` and USGS does not implement `includearrivals`, so `fdsn_get_allmagnitudes_by_id`, `fdsn_get_focalmechanism_by_id` and `fdsn_get_arrivals_by_id` were affected. The conversion is restricted to the flags this server actually sends, so a wrong keyword argument on our side still surfaces as a bug
   - test: drive the by-id contracts from QuakeML documents captured per provider and per `include*` flag set, parsed through the production ObsPy path, so the whole tool-by-provider matrix stays reproducible while the services are unreachable. Seventeen of the twenty cells run from captured QuakeML; the three the providers do not implement are pinned by their captured error bodies. The INGV event is `45376822`, chosen because it is complete down to a focal mechanism with a moment tensor, so every INGV cell serializes real content. Offline suite grows from 72 to 96 tests
