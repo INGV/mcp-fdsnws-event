@@ -1,0 +1,6 @@
+#EventID|Time|Latitude|Longitude|Depth/km|Author|Catalog|Contributor|ContributorID|MagType|Magnitude|MagAuthor|EventLocationName|EventType
+gfz2024abmz|2024-01-01T19:42:07.12|37.285|136.673|10.0|||GFZ|gfz2024abmz|mb|5.07||Near West Coast of Honshu, Japan|
+gfz2024abmn|2024-01-01T19:27:15.65|37.085|136.564|12.1|||GFZ|gfz2024abmn|mb|5.11||Near West Coast of Honshu, Japan|
+gfz2024abit|2024-01-01T17:33:31.23|37.634|137.437|10.0|||GFZ|gfz2024abit|mb|5.1||Near West Coast of Honshu, Japan|
+gfz2024aati|2024-01-01T09:45:26.89|37.738|137.595|10.0|||GFZ|gfz2024aati|mb|5.36||Near West Coast of Honshu, Japan|
+gfz2024aatd|2024-01-01T09:40:00.54|37.092|136.606|10.0|||GFZ|gfz2024aatd|mb|5.14||Near West Coast of Honshu, Japan|

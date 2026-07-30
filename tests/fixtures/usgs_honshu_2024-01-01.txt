@@ -1,0 +1,6 @@
+#EventID|Time|Latitude|Longitude|Depth/km|Author|Catalog|Contributor|ContributorID|MagType|Magnitude|MagAuthor|EventLocationName
+us6000m0yg|2024-01-01T09:45:26.217|37.8107|137.5664|10|us|us|us|us6000m0yg|mb|5.1|us|73 km WSW of Sado, Japan
+us6000m0yf|2024-01-01T09:39:59.811|37.1479|136.6562|10|us|us|us|us6000m0yf|mb|5|us|23 km WSW of Anamizu, Japan
+us6000m0ye|2024-01-01T09:30:21.401|37.4998|137.3585|10|us|us|us|us6000m0ye|mb|5.2|us|50 km NE of Anamizu, Japan
+us6000m0ya|2024-01-01T09:08:17.603|37.5146|137.4029|10|us|us|us|us6000m0ya|mb|5.6|us|54 km NE of Anamizu, Japan
+us6000m0y9|2024-01-01T09:03:48.859|37.5339|137.4185|10|us|us|us|us6000m0y9|mb|5.5|us|56 km NE of Anamizu, Japan

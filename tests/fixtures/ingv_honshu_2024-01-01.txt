@@ -1,0 +1,4 @@
+#EventID|Time|Latitude|Longitude|Depth/Km|Author|Catalog|Contributor|ContributorID|MagType|Magnitude|MagAuthor|EventLocationName|EventType
+37258271|2024-01-01T07:18:46.670000|37.216|136.591|19.5|SURVEY-INGV||||Mwp|6.1|--|Near west coast of eastern Honshu, Japan [Sea: Japan]|earthquake
+37258201|2024-01-01T07:10:13.000000|37.33|137.42|20.0|SURVEY-INGV||||Mwpd|7.4|--|Near west coast of eastern Honshu, Japan [Sea: Japan]|earthquake
+37258171|2024-01-01T07:06:11.251000|37.338|137.34|20.0|SURVEY-INGV||||Mwp|5.6|--|Near west coast of eastern Honshu, Japan [Sea: Japan]|earthquake
