@@ -297,7 +297,7 @@ This exposes:
 
 ### Connect OpenWebUI
 
-In OpenWebUI go to **Settings → Tools** (or **Admin → Settings → Tools**) and add the URL
+In OpenWebUI go to **Settings → Integrations** (or for _all_ users, **Admin Panel → Settings → Integrations**) and add a new "Tool Server" with the URL
 `http://<host>:8000`.
 
 - **If OpenWebUI itself runs in Docker**, `localhost:8000` from inside its container will not
