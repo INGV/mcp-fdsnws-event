@@ -66,7 +66,7 @@ Note the capital `K` at INGV only, and that three of the four use non-numeric
 identifiers. Both are why parsing is header-driven and why `eventid` is a string.
 
 IRIS/EarthScope is deliberately absent: its FDSNWS **event** service returns
-HTTP 410 (see `docs/adr/0007-*`), so there is nothing to capture.
+HTTP 410, so there is nothing to capture.
 
 ## Conventions
 

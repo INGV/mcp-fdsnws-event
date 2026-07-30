@@ -10,8 +10,8 @@ disagree sharply on invalid input -- an inverted time window yields HTTP 400 at 
 204 at EMSC and GFZ, and is silently *ignored* by USGS, which answers 200 with data --
 so those cases are asserted per provider instead of pretending to a common contract.
 
-IRIS/EarthScope is not in the provider list: its FDSNWS event service returns HTTP 410
-(ADR-0007). That retirement is itself pinned by a test at the end of this module.
+IRIS/EarthScope is not in the provider list: its FDSNWS event service returns HTTP 410.
+That retirement is itself pinned by a test at the end of this module.
 """
 
 import asyncio
@@ -49,7 +49,7 @@ ABSENT_EVENTS = [
     ("USGS", "us9999zzzzzz"),
 ]
 
-# The original INGV window, retained for the pagination check tied to ADR-0003.
+# The original INGV window, retained for the pagination check.
 INGV_WINDOW = {"starttime": "2012-05-29T00:00:00", "endtime": "2012-05-29T23:59:59"}
 
 
@@ -129,7 +129,7 @@ def test_ingv_rejects_inverted_window_with_verbatim_message():
 
 
 def test_ingv_offset_changes_results():
-    """Pagination is FDSN passthrough; see ADR-0003 on INGV's off-by-one."""
+    """Pagination is FDSN passthrough; INGV has an off-by-one on explicit offset."""
     _, page1, _ = run(
         query_events_text(**INGV_WINDOW, limit=3, offset=1, datacenter="INGV")
     )
@@ -156,7 +156,7 @@ def test_pagination_offset_advances(datacenter):
 
 
 def test_iris_event_service_is_retired():
-    """IRIS/EarthScope no longer serves FDSNWS event: HTTP 410 Gone (ADR-0007).
+    """IRIS/EarthScope no longer serves FDSNWS event: HTTP 410 Gone.
 
     Pinned as a test so that if the service ever comes back, this fails and prompts
     us to re-advertise it, instead of the omission quietly outliving its reason.

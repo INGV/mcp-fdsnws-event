@@ -7,7 +7,7 @@ when the services are unreachable, using responses captured in ``fixtures/``.
 
 Live counterparts live in ``tests/integration/test_live_datacenters.py``; the two
 must be kept in step. IRIS/EarthScope is absent on purpose: its FDSNWS event
-service returns HTTP 410 (ADR-0007), so it cannot be covered at all.
+service returns HTTP 410, so it cannot be covered at all.
 """
 
 import asyncio

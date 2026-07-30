@@ -4,7 +4,7 @@ The summary query path (``query_events_text``) talks to the datacenter directly 
 ``format=text`` and parses the pipe-delimited response, to keep responses small and to
 pass parameters (e.g. ``offset``) straight through without ObsPy's WADL validation.
 The by-id paths use ObsPy to retrieve and serialize full QuakeML. The server is
-datacenter-agnostic: no datacenter-specific behaviour lives here (see docs/adr).
+datacenter-agnostic: no datacenter-specific behaviour lives here.
 """
 
 import asyncio
@@ -129,7 +129,7 @@ async def query_events_text(
     params: dict = {"format": "text", "limit": limit, "orderby": orderby}
     # Omit offset at its default (1): omitting is equivalent to the FDSN spec default
     # and avoids INGV's off-by-one dropping the first event on the common single-page
-    # query. Explicit offset > 1 is passed straight through (see docs/adr/0003).
+    # query. Explicit offset > 1 is passed straight through.
     if offset and offset > 1:
         params["offset"] = offset
     optional = {

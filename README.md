@@ -316,9 +316,9 @@ In OpenWebUI go to **Settings → Tools** (or **Admin → Settings → Tools**) 
 When a client model loses an identifier across turns it may *invent* one — e.g.
 calling `fdsn_get_arrivals_by_id` with a placeholder `eventid` (`123456`) instead
 of the `EventID` returned by a prior `fdsn_query_earthquakes`. The server guards
-against this with a three-state by-id contract (`found` / `message`, see
-`docs/adr/0006`), but the behaviour itself lives in the OpenWebUI ↔ model loop and
-is best measured empirically.
+against this with a three-state by-id contract (`found` / `message`), but the
+behaviour itself lives in the OpenWebUI ↔ model loop and is best measured
+empirically.
 
 `tests/ab/eventid_hallucination_ab.py` is a standalone A/B harness (not run by
 `pytest`) that replays the failing conversation against a live model through the
