@@ -247,3 +247,68 @@ def test_found_event_reports_provider_event_id(
 
     assert out["found"] is True
     assert out["event_id"] == expected
+
+
+# --- Providers that do not implement a subresource -------------------------------
+#
+# EMSC serves events but not includeallmagnitudes, and USGS not includearrivals.
+# ObsPy catches the first case itself, from the provider's WADL, and raises a bare
+# TypeError before any request goes out -- which used to escape the tool as an
+# unhandled exception instead of the structured error contract.
+
+
+def _obspy_rejects(parameter):
+    """Stand in for ObsPy refusing an include flag the provider does not advertise."""
+
+    def get_events(**kwargs):
+        raise TypeError(f"The parameter '{parameter}' is not supported by the service.")
+
+    return get_events
+
+
+def test_unsupported_include_flag_becomes_a_datacenter_error(monkeypatch):
+    class FakeClient:
+        get_events = staticmethod(_obspy_rejects("includeallmagnitudes"))
+
+    monkeypatch.setattr(oc, "_get_client", lambda datacenter: FakeClient())
+
+    with pytest.raises(DatacenterError) as ei:
+        run(oc.get_allmagnitudes_by_id(eventid="20240101_0000328", datacenter="EMSC"))
+
+    assert "includeallmagnitudes" in str(ei.value)
+    assert ei.value.datacenter == "EMSC"
+
+
+def test_unsupported_include_flag_is_reported_in_band(monkeypatch):
+    """The tool must answer with the error payload, not raise at the MCP boundary."""
+
+    async def fake(eventid, datacenter="INGV"):
+        raise DatacenterError(
+            "The parameter 'includeallmagnitudes' is not supported by the service.",
+            datacenter=datacenter,
+            api_url="https://example/query",
+        )
+
+    monkeypatch.setattr(server, "get_allmagnitudes_by_id", fake)
+    out = json.loads(
+        run(
+            server.fdsn_get_allmagnitudes_by_id(
+                eventid="20240101_0000328", datacenter="EMSC"
+            )
+        )
+    )
+
+    assert out["error"] is True
+    assert out["datacenter"] == "EMSC"
+
+
+def test_our_own_bad_keyword_still_raises_type_error(monkeypatch):
+    """A typo in our kwargs is worded identically by ObsPy; it must stay a crash."""
+
+    class FakeClient:
+        get_events = staticmethod(_obspy_rejects("not_a_real_kwarg"))
+
+    monkeypatch.setattr(oc, "_get_client", lambda datacenter: FakeClient())
+
+    with pytest.raises(TypeError):
+        run(oc._get_events_quakeml("37258271", "INGV", not_a_real_kwarg=True))
