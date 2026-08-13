@@ -149,7 +149,11 @@ Returns the basic information for a single event: preferred origin, preferred ma
 station magnitudes, and amplitudes.
 
 **Parameters:**
-- `eventid` (required): event ID (integer)
+- `eventid` (required): event identifier, as returned by `fdsn_query_earthquakes`.
+  Treated as an opaque string matching `^[A-Za-z0-9_.:-]+$`, so the differing
+  conventions of the providers are all accepted (`45376822` at INGV,
+  `20240101_0000328` at EMSC, `gfz2024abmz` at GFZ, `us6000m0yg` at USGS). A JSON
+  integer is still accepted and normalised.
 - `datacenter` (optional): default `"INGV"`
 
 #### 3. `fdsn_get_arrivals_by_id`
@@ -158,7 +162,8 @@ Returns all seismic phase arrivals for an event, with the associated picks (stat
 arrival time, phase). Useful to know which stations recorded the event.
 
 **Parameters:**
-- `eventid` (required): event ID (integer)
+- `eventid` (required): opaque event identifier, as described for
+  `fdsn_get_earthquake_by_id` above.
 - `datacenter` (optional): default `"INGV"`
 
 #### 4. `fdsn_get_allmagnitudes_by_id`
@@ -167,7 +172,8 @@ Returns all magnitude solutions computed for an event (ML, Mw, Mb, Md, etc.), in
 which one is preferred. Useful for comparing magnitude types or agencies.
 
 **Parameters:**
-- `eventid` (required): event ID (integer)
+- `eventid` (required): opaque event identifier, as described for
+  `fdsn_get_earthquake_by_id` above.
 - `datacenter` (optional): default `"INGV"`
 
 #### 5. `fdsn_get_allorigins_by_id`
@@ -176,7 +182,8 @@ Returns all origin solutions (hypocenter locations) for an event, indicating whi
 preferred. Useful to compare locations computed by different agencies.
 
 **Parameters:**
-- `eventid` (required): event ID (integer)
+- `eventid` (required): opaque event identifier, as described for
+  `fdsn_get_earthquake_by_id` above.
 - `datacenter` (optional): default `"INGV"`
 
 #### 6. `fdsn_get_focalmechanism_by_id`
@@ -185,7 +192,8 @@ Returns the focal mechanisms and moment tensors for an event: nodal planes (stri
 rake), principal axes (T, P, N), and moment tensor components.
 
 **Parameters:**
-- `eventid` (required): event ID (integer)
+- `eventid` (required): opaque event identifier, as described for
+  `fdsn_get_earthquake_by_id` above.
 - `datacenter` (optional): default `"INGV"`
 
 ## MCP client configuration

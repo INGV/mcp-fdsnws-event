@@ -10,10 +10,12 @@ authors = [
     {name = "Valentino Lauciani", email = "valentino.lauciani@ingv.it"}
 ]
 dependencies = [
-    # 1.8.0-dev is the first release exposing mcp.types.ToolAnnotations (used by
-    # server.py); mcp.server.fastmcp did not exist before 1.8.0-dev. Any older release
-    # fails at import, so the previous ">=1.0.0" was never actually satisfiable.
-    "mcp>=1.8.0-dev,<2",
+    # This floor is the version of the mcp library, not of this project: a release bump
+    # must not rewrite it. mcp 1.7.0 is the first release exposing
+    # mcp.types.ToolAnnotations (used by server.py), and mcp.server.fastmcp did not
+    # exist before 1.6.0. Any older release fails at import, so the ">=1.0.0" this
+    # replaced was never actually satisfiable.
+    "mcp>=1.7.0,<2",
     "obspy>=1.4.2,<2",
     "pydantic>=2,<3",
     "requests>=2.31,<3"
