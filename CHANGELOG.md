@@ -1,5 +1,8 @@
 # Release Notes
 
+### Release 1.9.0-dev (2026-08-13)
+  - . . .
+
 ### Release 1.8.0 (2026-08-13)
   - fix: restore the `mcp>=1.7.0` dependency floor in `pyproject.toml`. The 1.8.0 version bump rewrote it to `mcp>=1.8.0`, applying this project's version to a third-party library: the floor no longer matched the API the code needs, and it excluded the mcp releases the image and the CI matrix actually install. The comment now says the line is not a project version, so the next bump leaves it alone
   - docs: document `eventid` in the README as the opaque string it has been since 1.4.0, giving the accepted form of each provider's identifier, instead of describing it as an integer for all five by-id tools
