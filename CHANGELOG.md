@@ -1,5 +1,9 @@
 # Release Notes
 
+### Release 1.8.0 (2026-08-13)
+  - fix: restore the `mcp>=1.7.0` dependency floor in `pyproject.toml`. The 1.8.0 version bump rewrote it to `mcp>=1.8.0`, applying this project's version to a third-party library: the floor no longer matched the API the code needs, and it excluded the mcp releases the image and the CI matrix actually install. The comment now says the line is not a project version, so the next bump leaves it alone
+  - docs: document `eventid` in the README as the opaque string it has been since 1.4.0, giving the accepted form of each provider's identifier, instead of describing it as an integer for all five by-id tools
+
 ### Release 1.7.0 (2026-07-30)
   - docs: state in the README that `compose.mcpo.yml` is a development configuration and not a hardened one, listing what it does not provide (it binds `0.0.0.0`, publishes the port on every interface, leaves authentication commented out, and bounds neither request rate nor upstream concurrency) and noting that those controls belong to the deployment rather than to the MCP server
 
