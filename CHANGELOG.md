@@ -1,6 +1,6 @@
 # Release Notes
 
-### Release 1.9.0-dev (2026-09-09)
+### Release 1.9.0 (2026-09-09)
   - docs: cite the SoftwareX paper describing this server (https://doi.org/10.1016/j.softx.2026.103001) from a DOI badge and a `Citation` section in the README, and add a `CITATION.cff` so GitHub renders the *Cite this repository* button and derives APA/BibTeX from the article metadata
 
 ### Release 1.8.0 (2026-08-13)
