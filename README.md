@@ -1,3 +1,4 @@
+[![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.softx.2026.103001-blue)](https://doi.org/10.1016/j.softx.2026.103001)
 [![Build Status](https://github.com/INGV/mcp-fdsnws-event/actions/workflows/docker-build-push.yml/badge.svg?branch=main)](https://github.com/INGV/mcp-fdsnws-event/actions/workflows/docker-build-push.yml?query=branch%3Amain)
 [![Version](https://img.shields.io/badge/dynamic/yaml?label=ver&query=softwareVersion&url=https://raw.githubusercontent.com/INGV/mcp-fdsnws-event/main/publiccode.yml)](https://github.com/INGV/mcp-fdsnws-event/blob/main/publiccode.yml)
 [![Docker Pulls](https://img.shields.io/docker/pulls/ingv/mcp-fdsnws-event)](https://hub.docker.com/r/ingv/mcp-fdsnws-event)
@@ -354,6 +355,36 @@ It fails fast if `--model` is not present on the instance, and compares two tool
 descriptions (`baseline` vs `fixed`) so you can attribute any delta to the
 server-side wording. Use it to check a new model, or to confirm that an OpenWebUI
 configuration change (e.g. **Native** function calling) actually fixes id reuse.
+
+## Citation
+
+If you use this software in your research, please cite the accompanying paper,
+published open access (CC BY 4.0) in *SoftwareX*:
+
+> Lauciani, V., & Bailo, D. (2026). mcp-fdsnws-event: An MCP gateway for
+> FDSNWS-event web services. *SoftwareX*, 35, 103001.
+> https://doi.org/10.1016/j.softx.2026.103001
+
+<details>
+<summary>BibTeX</summary>
+
+```bibtex
+@article{lauciani2026mcpfdsnwsevent,
+  title   = {mcp-fdsnws-event: An MCP gateway for FDSNWS-event web services},
+  author  = {Lauciani, Valentino and Bailo, Daniele},
+  journal = {SoftwareX},
+  volume  = {35},
+  pages   = {103001},
+  year    = {2026},
+  issn    = {2352-7110},
+  doi     = {10.1016/j.softx.2026.103001}
+}
+```
+
+</details>
+
+A [`CITATION.cff`](CITATION.cff) file is also provided, so GitHub can generate the
+citation in APA or BibTeX from the *Cite this repository* button.
 
 ## License
 
