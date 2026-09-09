@@ -1,0 +1,48 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite both the software and the paper below."
+title: "mcp-fdsnws-event: FDSNWS Event MCP Server"
+abstract: >-
+  An MCP (Model Context Protocol) server that wraps the FDSN Web Service Event
+  APIs of multiple seismological datacenters (INGV, EMSC, GFZ, USGS, and other
+  FDSN-compliant services) and provides earthquake data as JSON to MCP clients.
+type: software
+authors:
+  - family-names: Lauciani
+    given-names: Valentino
+    email: valentino.lauciani@ingv.it
+    orcid: "https://orcid.org/0000-0002-9672-7428"
+    affiliation: "Istituto Nazionale di Geofisica e Vulcanologia (INGV)"
+  - family-names: Bailo
+    given-names: Daniele
+    email: daniele.bailo@ingv.it
+    orcid: "https://orcid.org/0000-0003-0695-4406"
+    affiliation: "Istituto Nazionale di Geofisica e Vulcanologia (INGV)"
+repository-code: "https://github.com/INGV/mcp-fdsnws-event"
+url: "https://github.com/INGV/mcp-fdsnws-event"
+license: AGPL-3.0-or-later
+keywords:
+  - model context protocol
+  - mcp
+  - fdsnws
+  - earthquake
+  - seismology
+  - quakeml
+  - obspy
+preferred-citation:
+  type: article
+  title: "mcp-fdsnws-event: An MCP gateway for FDSNWS-event web services"
+  authors:
+    - family-names: Lauciani
+      given-names: Valentino
+      orcid: "https://orcid.org/0000-0002-9672-7428"
+    - family-names: Bailo
+      given-names: Daniele
+      orcid: "https://orcid.org/0000-0003-0695-4406"
+  journal: "SoftwareX"
+  volume: 35
+  start: 103001
+  year: 2026
+  month: 9
+  issn: "2352-7110"
+  doi: "10.1016/j.softx.2026.103001"
+  url: "https://doi.org/10.1016/j.softx.2026.103001"
