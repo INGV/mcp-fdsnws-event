@@ -166,6 +166,8 @@ reported experiment. Review responses before sharing them.
 Classification is deterministic, with mutually exclusive attempt counts:
 
 - `CORRECT`: both fields match; in D, no tool call.
+  In D this only means no unsupported detail-tool call was made; factual claims
+  in the response text are not scored.
 - `WRONG_EVENTID`, `WRONG_DATACENTER`, `WRONG_BOTH`: valid arguments with the
   respective mismatch. Missing `datacenter` means INGV. Named datacenters are
   case-insensitive, as in the production ObsPy path; ID strings stay exact.

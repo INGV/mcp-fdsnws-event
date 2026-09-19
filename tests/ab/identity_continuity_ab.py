@@ -277,9 +277,9 @@ def call(base_url: str, api_key: str, model: str, scenario: str,
         calls = message.get("tool_calls")
         if content is not None and not isinstance(content, str):
             raise ValueError("Invalid assistant content")
-        # Legacy function_call is not the tools protocol offered in this experiment.
+        # A missing/null legacy field is inert; any actual legacy payload is unsupported.
         finish = choice.get("finish_reason")
-        if "function_call" in message or finish not in ("stop", "tool_calls"):
+        if message.get("function_call") is not None or finish not in ("stop", "tool_calls"):
             raise ValueError("Unsupported or incomplete completion")
         if finish == "tool_calls" and (not isinstance(calls, list) or not calls):
             raise ValueError("Missing calls in a tool completion")

@@ -293,6 +293,53 @@ def completion(message, finish_reason="tool_calls"):
     return {"choices": [{"message": message, "finish_reason": finish_reason}]}
 
 
+@pytest.mark.parametrize("scenario,message,finish,expected", [
+    ("A", tool_message({"datacenter": "GFZ", "eventid": "gfz2024abmz"}), "tool_calls", "CORRECT"),
+    ("A", tool_message({"datacenter": "GFZ", "eventid": "gfz2024abmx"}), "tool_calls", "WRONG_EVENTID"),
+    ("A", tool_message({"datacenter": "INGV", "eventid": "gfz2024abmz"}), "tool_calls", "WRONG_DATACENTER"),
+    ("A", tool_message({"datacenter": "INGV", "eventid": "37258271"}), "tool_calls", "WRONG_BOTH"),
+    ("A", {"role": "assistant", "content": "Please clarify.", "tool_calls": None}, "stop", "NO_TOOL_CALL"),
+    ("D", {"role": "assistant", "content": "Query failed.", "tool_calls": None}, "stop", "CORRECT"),
+    ("D", tool_message({"eventid": "invented"}), "tool_calls", "UNEXPECTED_TOOL_CALL"),
+    ("A", tool_message({"eventid": False}), "tool_calls", "MALFORMED_ARGS"),
+])
+def test_nullable_legacy_field_preserves_action_classification(
+    monkeypatch, scenario, message, finish, expected
+):
+    assert invoke(monkeypatch, completion(message, finish), scenario)["status"] == expected
+    with_null = {**message, "function_call": None}
+    result = invoke(monkeypatch, completion(with_null, finish), scenario)
+    assert result["status"] == expected
+    assert result["message"] == with_null
+    assert result["error"] is None
+
+
+@pytest.mark.parametrize("legacy", [{}, {"name": "legacy", "arguments": "{}"}])
+def test_nonnull_legacy_field_remains_unsupported(monkeypatch, legacy):
+    message = tool_message({"datacenter": "GFZ", "eventid": "gfz2024abmz"})
+    message["function_call"] = legacy
+    result = invoke(monkeypatch, completion(message))
+    assert result["status"] == "HTTP_ERROR"
+    assert result["message"] is None
+
+
+def test_nullable_legacy_field_keeps_no_call_in_rate_denominator(monkeypatch):
+    correct = tool_message({"datacenter": "GFZ", "eventid": "gfz2024abmz"})
+    no_call = {
+        "role": "assistant", "content": "Please clarify.",
+        "tool_calls": None, "function_call": None,
+    }
+    statuses = [
+        invoke(monkeypatch, completion(correct))["status"],
+        invoke(monkeypatch, completion(no_call, "stop"))["status"],
+    ]
+    summary = harness.summarize(Counter(statuses))
+    assert summary["total_attempts"] == summary["evaluable_attempts"] == 2
+    assert summary["counts"]["NO_TOOL_CALL"] == 1
+    assert summary["counts"]["HTTP_ERROR"] == 0
+    assert summary["correct_rate"] == 0.5
+
+
 def test_network_wrapper_sends_frozen_payload_and_scores_response(monkeypatch):
     message = tool_message({"datacenter": "GFZ", "eventid": "gfz2024abmz"})
     sent = {}
