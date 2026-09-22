@@ -1,9 +1,10 @@
 """Multi-datacenter compatibility matrix, offline (fixtures + mocked network).
 
 The advertised providers do not agree on much: identifier format, column set,
-column spelling, and which HTTP status means "no such event" all differ. This
-module pins that behaviour down per provider so the matrix stays reproducible
-when the services are unreachable, using responses captured in ``fixtures/``.
+column spelling, which HTTP status means "no such event", and which subresources
+exist at all differ. This module pins that behaviour down per provider so the
+matrix stays reproducible when the services are unreachable, using responses
+captured in ``fixtures/``.
 
 Live counterparts live in ``tests/integration/test_live_datacenters.py``; the two
 must be kept in step. IRIS/EarthScope is absent on purpose: its FDSNWS event
@@ -22,7 +23,8 @@ from pydantic import ValidationError
 
 import fdsnws_event_server.obspy_client as oc
 import fdsnws_event_server.server as server
-from fdsnws_event_server.models import GetEarthquakeByIdInput
+from fdsnws_event_server import tables
+from fdsnws_event_server.models import GetEarthquakeByEventIdInput
 from fdsnws_event_server.obspy_client import (
     DatacenterError,
     _extract_event_id,
@@ -66,8 +68,10 @@ def test_provider_response_parses(
 
     assert len(columns) == ncols
     assert columns[0] == "EventID"
-    # Depth is spelled Depth/Km at INGV and Depth/km everywhere else. Nothing in
-    # the server may key on the spelling; the column list is passed through as-is.
+    # Depth is spelled Depth/Km at INGV and Depth/km everywhere else, and EventType
+    # is missing entirely from EMSC and USGS. The parser knows none of that: it
+    # reports the header as the datacenter wrote it, and the mapping onto stable
+    # names happens one layer up (see test_query_earthquakes_normalizes_columns).
     assert depth_header in columns
     assert ("EventType" in columns) is has_eventtype
     assert rows and rows[0][0] == first_id
@@ -83,6 +87,7 @@ def test_provider_response_parses(
 def test_query_returns_provider_columns_unmodified(
     monkeypatch, datacenter, fixture, ncols, depth_header, has_eventtype, first_id
 ):
+    """The data-access layer hands the header on untouched, whatever it says."""
     raw = (FIXTURES / fixture).read_text()
     monkeypatch.setattr(oc.requests, "get", lambda url, timeout=None: FakeResp(200, raw))
 
@@ -93,6 +98,45 @@ def test_query_returns_provider_columns_unmodified(
         [line for line in raw.splitlines() if line.strip() and not line.startswith("#")]
     )
     assert datacenter.lower() in api_url.lower() or api_url.startswith("http")
+
+
+@pytest.mark.parametrize(
+    "datacenter,fixture,ncols,depth_header,has_eventtype,first_id",
+    PROVIDERS, ids=PROVIDER_IDS,
+)
+def test_query_earthquakes_normalizes_columns(
+    monkeypatch, datacenter, fixture, ncols, depth_header, has_eventtype, first_id
+):
+    """The tool answers with FDSN 1.2 names, so the schema stops depending on who replied.
+
+    Passing the header through made the *column names* a provider detail: the same
+    depth arrived as "Depth/Km" or "Depth/km" depending on the datacenter, so any
+    consumer that keyed on one broke on the other. Normalizing here costs nothing
+    and no column is dropped -- an unrecognised one is lowercased and kept.
+    """
+    raw = (FIXTURES / fixture).read_text()
+    monkeypatch.setattr(oc.requests, "get", lambda url, timeout=None: FakeResp(200, raw))
+
+    out = json.loads(run(server.fdsn_query_earthquakes(datacenter=datacenter)))
+
+    columns = out["columns"]
+    assert len(columns) == ncols
+    assert columns[0] == "event_id"
+    assert "depth_km" in columns
+    # EventType is absent from two providers; normalization renames, it never invents.
+    assert ("event_type" in columns) is has_eventtype
+    assert out["rows"][0][0] == first_id
+    assert all(len(row) == ncols for row in out["rows"])
+
+    # The paging fields sit in the envelope itself. They used to live in a nested
+    # "pagination" object, which meant a model reading the result had to know one
+    # more level of structure to answer "is there more".
+    assert "pagination" not in out
+    assert out["returned_count"] == len(out["rows"])
+    assert out["limit"] and out["offset"] == 1
+    assert out["has_more"] is False
+    assert out["ordered_by"] == "time"
+    assert out["datacenter"] == datacenter
 
 
 # --- Identifier formats ----------------------------------------------------
@@ -109,7 +153,7 @@ def test_real_provider_identifiers_are_accepted(
     Before `eventid` became a string this failed for three providers out of four:
     GFZ and USGS were rejected outright, and EMSC's was silently coerced.
     """
-    params = GetEarthquakeByIdInput(eventid=first_id, datacenter=datacenter)
+    params = GetEarthquakeByEventIdInput(eventid=first_id, datacenter=datacenter)
     assert params.eventid == first_id
 
 
@@ -122,20 +166,20 @@ def test_emsc_identifier_is_not_mangled_by_int_coercion():
     for a perfectly valid identifier.
     """
     emsc_id = "20240101_0000328"
-    assert GetEarthquakeByIdInput(eventid=emsc_id).eventid == emsc_id
+    assert GetEarthquakeByEventIdInput(eventid=emsc_id).eventid == emsc_id
     assert str(int(emsc_id)) != emsc_id  # the trap this guards against
 
 
 def test_integer_eventid_still_accepted_for_backward_compatibility():
     """The pre-1.4 schema advertised an integer, so clients still send one."""
-    assert GetEarthquakeByIdInput(eventid=37258271).eventid == "37258271"
+    assert GetEarthquakeByEventIdInput(eventid=37258271).eventid == "37258271"
 
 
 @pytest.mark.parametrize("bad", ["", "has space", "a&b=1", "../etc/passwd", "x" * 65])
 def test_malformed_identifiers_rejected(bad):
     """Malformed ids are refused client-side, before any upstream request."""
     with pytest.raises(ValidationError):
-        GetEarthquakeByIdInput(eventid=bad)
+        GetEarthquakeByEventIdInput(eventid=bad)
 
 
 # QuakeML resource_id spellings observed per provider -> expected extracted id.
@@ -218,9 +262,9 @@ def test_not_found_message_echoes_non_numeric_id(monkeypatch, datacenter, eventi
     async def fake(eventid, datacenter="INGV"):
         return Catalog(), f"https://example/query?eventid={eventid}"
 
-    monkeypatch.setattr(server, "get_event_by_id", fake)
+    monkeypatch.setattr(server, "get_event_by_eventid", fake)
     out = json.loads(
-        run(server.fdsn_get_earthquake_by_id(eventid=eventid, datacenter=datacenter))
+        run(server.fdsn_get_earthquake_by_eventid(eventid=eventid, datacenter=datacenter))
     )
 
     assert out["found"] is False
@@ -241,9 +285,9 @@ def test_found_event_reports_provider_event_id(
             "https://example/query",
         )
 
-    monkeypatch.setattr(server, "get_allorigins_by_id", fake)
+    monkeypatch.setattr(server, "get_allorigins_by_eventid", fake)
     out = json.loads(
-        run(server.fdsn_get_allorigins_by_id(eventid=expected, datacenter=datacenter))
+        run(server.fdsn_get_allorigins_by_eventid(eventid=expected, datacenter=datacenter))
     )
 
     assert out["found"] is True
@@ -274,7 +318,7 @@ def test_unsupported_include_flag_becomes_a_datacenter_error(monkeypatch):
     monkeypatch.setattr(oc, "_get_client", lambda datacenter: FakeClient())
 
     with pytest.raises(DatacenterError) as ei:
-        run(oc.get_allmagnitudes_by_id(eventid="20240101_0000328", datacenter="EMSC"))
+        run(oc.get_allmagnitudes_by_eventid(eventid="20240101_0000328", datacenter="EMSC"))
 
     assert "includeallmagnitudes" in str(ei.value)
     assert ei.value.datacenter == "EMSC"
@@ -290,10 +334,10 @@ def test_unsupported_include_flag_is_reported_in_band(monkeypatch):
             api_url="https://example/query",
         )
 
-    monkeypatch.setattr(server, "get_allmagnitudes_by_id", fake)
+    monkeypatch.setattr(server, "get_allmagnitudes_by_eventid", fake)
     out = json.loads(
         run(
-            server.fdsn_get_allmagnitudes_by_id(
+            server.fdsn_get_allmagnitudes_by_eventid(
                 eventid="20240101_0000328", datacenter="EMSC"
             )
         )
@@ -315,10 +359,67 @@ def test_our_own_bad_keyword_still_raises_type_error(monkeypatch):
         run(oc._get_events_quakeml("37258271", "INGV", not_a_real_kwarg=True))
 
 
-# --- By-id contracts driven by real provider QuakeML -----------------------------
+# --- The one retry, driven by status and not by provider name -------------------
 #
-# The fixtures above cover the search path. These cover the by-id path from captured
-# QuakeML, one document per provider and per include-flag set, so the whole
+# Station magnitudes and amplitudes are fetched with includearrivals, because on
+# EMSC that flag is the difference between 114 station magnitudes and none. USGS
+# answers 501 to it. The retry is therefore keyed on the status the server sent,
+# not on the datacenter's name, so a node nobody has tested gets the same rule.
+
+
+def _recording_quakeml(monkeypatch, failing_status):
+    """Patch the shared QuakeML fetch, recording the include flags of every call."""
+    calls = []
+
+    async def fake(eventid, datacenter, **extra):
+        calls.append(extra)
+        if "includearrivals" in extra:
+            raise DatacenterError(
+                "Service responds: Not Implemented",
+                status=failing_status,
+                datacenter=datacenter,
+                api_url="https://example/query",
+            )
+        return Catalog(events=[Event()]), "https://example/query"
+
+    monkeypatch.setattr(oc, "_get_events_quakeml", fake)
+    return calls
+
+
+@pytest.mark.parametrize(
+    "fetch", ["get_stationmagnitudes_by_eventid", "get_amplitudes_by_eventid"]
+)
+def test_station_level_fetch_retries_without_includearrivals(monkeypatch, fetch):
+    """A 501 on the flag costs one extra request, not the whole answer."""
+    calls = _recording_quakeml(monkeypatch, 501)
+
+    catalog, api_url = run(getattr(oc, fetch)("us6000m0yg", "USGS"))
+
+    assert calls == [{"includearrivals": True}, {}]
+    assert len(catalog) == 1
+
+
+@pytest.mark.parametrize(
+    "fetch", ["get_stationmagnitudes_by_eventid", "get_amplitudes_by_eventid"]
+)
+def test_station_level_fetch_does_not_retry_other_errors(monkeypatch, fetch):
+    """Only "not implemented" is worth a second attempt.
+
+    Retrying a 400 would send the same bad request twice and report the second
+    failure, hiding the first; the caller must see the datacenter's own answer.
+    """
+    calls = _recording_quakeml(monkeypatch, 400)
+
+    with pytest.raises(DatacenterError):
+        run(getattr(oc, fetch)("20240101_0000328", "EMSC"))
+
+    assert calls == [{"includearrivals": True}]
+
+
+# --- By-eventid contracts driven by real provider QuakeML ------------------------
+#
+# The fixtures above cover the search path. These cover the by-eventid path from
+# captured QuakeML, one document per provider and per include-flag set, so the whole
 # tool-by-provider matrix stays reproducible while the services are unreachable.
 # Parsing goes through ObsPy exactly as in production, which is the point: what is
 # under test is our serialization of each provider's real event structure, not a
@@ -327,7 +428,7 @@ def test_our_own_bad_keyword_still_raises_type_error(monkeypatch):
 QUAKEML_EVENTS = {
     # INGV: Mw 3.5, Moggio Udinese, 2026-03-19. Chosen because it is complete --
     # 150 arrivals, 6 origins, 6 magnitudes, 575 station magnitudes, 1235 amplitudes,
-    # and a focal mechanism with a moment tensor -- so every by-id tool has real
+    # and a focal mechanism with a moment tensor -- so every by-eventid tool has real
     # content to serialize instead of an empty subresource.
     "INGV": "45376822",
     "EMSC": "20240101_0000328",
@@ -336,21 +437,63 @@ QUAKEML_EVENTS = {
 }
 
 # (fixture variant, tool, fetch function it calls, key holding the item count).
-# focalmechanism shares the allmagnitudes document because it sends the same flag.
+# focalmechanism shares the allmagnitudes document because it sends the same flag,
+# and the two station-level tables share the arrivals document because both are
+# fetched with includearrivals because EMSC publishes neither collection without it.
 BYID_TOOLS = [
-    ("plain", "fdsn_get_earthquake_by_id", "get_event_by_id", None),
-    ("arrivals", "fdsn_get_arrivals_by_id", "get_arrivals_by_id", "arrivals_count"),
-    ("allmagnitudes", "fdsn_get_allmagnitudes_by_id", "get_allmagnitudes_by_id",
+    ("plain", "fdsn_get_earthquake_by_eventid", "get_event_by_eventid", None),
+    ("arrivals", "fdsn_get_arrivals_by_eventid", "get_arrivals_by_eventid",
+     "arrivals_count"),
+    ("allmagnitudes", "fdsn_get_allmagnitudes_by_eventid", "get_allmagnitudes_by_eventid",
      "magnitudes_count"),
-    ("allorigins", "fdsn_get_allorigins_by_id", "get_allorigins_by_id",
+    ("allorigins", "fdsn_get_allorigins_by_eventid", "get_allorigins_by_eventid",
      "origins_count"),
-    ("allmagnitudes", "fdsn_get_focalmechanism_by_id", "get_focalmechanism_by_id",
+    ("allmagnitudes", "fdsn_get_focalmechanism_by_eventid", "get_focalmechanism_by_eventid",
      "focal_mechanisms_count"),
+    ("arrivals", "fdsn_get_stationmagnitudes_by_eventid",
+     "get_stationmagnitudes_by_eventid", "station_magnitudes_count"),
+    ("arrivals", "fdsn_get_amplitudes_by_eventid", "get_amplitudes_by_eventid",
+     "amplitudes_count"),
 ]
+
+# The tools that answer with a table, and the column set each one publishes.
+TABLE_COLUMNS = {
+    "fdsn_get_arrivals_by_eventid": tables.ARRIVAL_COLUMNS,
+    "fdsn_get_stationmagnitudes_by_eventid": tables.STATIONMAGNITUDE_COLUMNS,
+    "fdsn_get_amplitudes_by_eventid": tables.AMPLITUDE_COLUMNS,
+}
+
+# What each captured document actually contains, so the matrix fails loudly if a
+# fixture is ever replaced by a thinner one and a cell quietly stops testing
+# anything. GFZ publishes no station-level data at all for this event, which is
+# what makes it the provider that exercises the absence branch below.
+EXPECTED_COUNTS = {
+    ("INGV", "arrivals_count"): 150,
+    ("INGV", "magnitudes_count"): 6,
+    ("INGV", "origins_count"): 6,
+    ("INGV", "focal_mechanisms_count"): 1,
+    ("INGV", "station_magnitudes_count"): 575,
+    ("INGV", "amplitudes_count"): 1235,
+    ("EMSC", "arrivals_count"): 632,
+    ("EMSC", "origins_count"): 10,
+    ("EMSC", "station_magnitudes_count"): 225,
+    ("EMSC", "amplitudes_count"): 632,
+    ("GFZ", "arrivals_count"): 125,
+    ("GFZ", "magnitudes_count"): 2,
+    ("GFZ", "origins_count"): 3,
+    ("GFZ", "focal_mechanisms_count"): 0,
+    ("GFZ", "station_magnitudes_count"): 0,
+    ("GFZ", "amplitudes_count"): 0,
+    ("USGS", "magnitudes_count"): 1,
+    ("USGS", "origins_count"): 1,
+    ("USGS", "focal_mechanisms_count"): 0,
+}
 
 # EMSC does not implement includeallmagnitudes and USGS does not implement
 # includearrivals, so no document exists to capture; those two cells are covered by
-# the captured error bodies below instead.
+# the captured error bodies below instead. USGS therefore has no station-level cell
+# either: both tables are fetched with that same flag, and what USGS does with it is
+# tested above, against the retry rather than against a fixture.
 BYID_CASES = [
     (dc, variant, tool, fetch, count_key)
     for dc in QUAKEML_EVENTS
@@ -358,8 +501,9 @@ BYID_CASES = [
     if (FIXTURES / f"{dc.lower()}_{variant}.quakeml.xml").exists()
 ]
 
-# Test ids name the tool, not the fixture variant, because two tools share a document.
-BYID_IDS = [f"{c[0]}-{c[2].removeprefix('fdsn_get_').removesuffix('_by_id')}"
+# Test ids name the tool, not the fixture variant, because several tools share a
+# document.
+BYID_IDS = [f"{c[0]}-{c[2].removeprefix('fdsn_get_').removesuffix('_by_eventid')}"
             for c in BYID_CASES]
 
 
@@ -390,22 +534,49 @@ def test_byid_serializes_real_provider_quakeml(
     assert out["datacenter"] == datacenter
 
     if count_key is None:
-        # fdsn_get_earthquake_by_id reports the event itself, with no count.
-        assert out["event"]
+        # fdsn_get_earthquake_by_eventid reports the event itself, with no count.
+        # The id is read back from the event's own resource_id, which is the shape
+        # that used to be mis-parsed for USGS.
+        assert out["event"]["event_id"] == eventid
         return
 
     # The identifier must survive the round trip through the provider's own
-    # resource_id form -- the shape that used to be mis-parsed for USGS.
+    # resource_id form.
     assert out["event_id"] == eventid
-    assert isinstance(out[count_key], int)
+    assert out[count_key] == EXPECTED_COUNTS[(datacenter, count_key)]
+
     if out[count_key] == 0:
         # Three-state contract: the event exists but carries no such subresource, which
         # must be said rather than returned as an empty payload. Reached where a
-        # provider computes no focal mechanism for the event.
+        # provider computes no focal mechanism for the event, and on GFZ, which
+        # publishes no station-level data for it.
         assert out["message"]
-    else:
+        if tool in TABLE_COLUMNS:
+            assert out["rows"] == [] and out["returned_count"] == 0
+        return
+
+    if tool not in TABLE_COLUMNS:
         # "origins_count" counts "origins", and so on.
         assert out[count_key] == len(out[count_key.removesuffix("_count")])
+        return
+
+    # A table is paginated, so the count above is the event's total and the page is
+    # whatever fits under `limit`. Everything a caller needs to walk the rest of it
+    # has to be consistent, whichever provider produced the document.
+    columns = TABLE_COLUMNS[tool]
+    assert out["columns"] == list(columns)
+    assert all(len(row) == len(columns) for row in out["rows"])
+    assert out["returned_count"] == len(out["rows"]) <= out["limit"]
+    # No filter was applied, so "rows matching this query" and "rows this event has"
+    # are the same number.
+    assert out["total_count"] == out[count_key]
+    assert out["has_more"] is (out["returned_count"] < out["total_count"])
+    assert ("next_offset" in out) is out["has_more"]
+    if out["has_more"]:
+        assert out["next_offset"] == out["offset"] + out["returned_count"]
+    # Prefixes are an encoding of the id columns, so every key must be a column.
+    assert set(out["id_prefixes"]) <= set(columns)
+    assert out["ordered_by"]
 
 
 def test_absent_subresource_is_explained_not_returned_empty(monkeypatch):
@@ -420,13 +591,15 @@ def test_absent_subresource_is_explained_not_returned_empty(monkeypatch):
     async def fake(eventid, datacenter="INGV"):
         return (catalog, "https://example/query")
 
-    monkeypatch.setattr(server, "get_arrivals_by_id", fake)
+    monkeypatch.setattr(server, "get_arrivals_by_eventid", fake)
     out = json.loads(
-        run(server.fdsn_get_arrivals_by_id(eventid="37258271", datacenter="INGV"))
+        run(server.fdsn_get_arrivals_by_eventid(eventid="37258271", datacenter="INGV"))
     )
 
     assert out["found"] is True
     assert out["arrivals_count"] == 0
+    assert out["returned_count"] == 0
+    assert out["rows"] == []
     assert out["message"]
 
 
@@ -434,12 +607,12 @@ def test_absent_subresource_is_explained_not_returned_empty(monkeypatch):
     "datacenter,variant,parameter,tool,fetch",
     [
         ("EMSC", "allmagnitudes", "includeallmagnitudes",
-         "fdsn_get_allmagnitudes_by_id", "get_allmagnitudes_by_id"),
+         "fdsn_get_allmagnitudes_by_eventid", "get_allmagnitudes_by_eventid"),
         # Same refusal reaches a second tool, because focalmechanism sends the same flag.
         ("EMSC", "allmagnitudes", "includeallmagnitudes",
-         "fdsn_get_focalmechanism_by_id", "get_focalmechanism_by_id"),
+         "fdsn_get_focalmechanism_by_eventid", "get_focalmechanism_by_eventid"),
         ("USGS", "arrivals", "includearrivals",
-         "fdsn_get_arrivals_by_id", "get_arrivals_by_id"),
+         "fdsn_get_arrivals_by_eventid", "get_arrivals_by_eventid"),
     ],
     ids=["EMSC-allmagnitudes", "EMSC-focalmechanism", "USGS-arrivals"],
 )

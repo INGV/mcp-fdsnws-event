@@ -9,7 +9,6 @@ datacenter-agnostic: no datacenter-specific behaviour lives here.
 
 import asyncio
 import logging
-import os
 import re
 from enum import Enum
 from typing import Optional
@@ -18,12 +17,17 @@ from urllib.parse import urlencode
 import requests
 from obspy import Catalog, UTCDateTime
 from obspy.clients.fdsn import Client
-from obspy.clients.fdsn.header import FDSNException, FDSNNoDataException, URL_MAPPINGS
+from obspy.clients.fdsn.header import (
+    FDSNException,
+    FDSNNoDataException,
+    FDSNNotImplementedException,
+    URL_MAPPINGS,
+)
 from obspy.core.event import ResourceIdentifier
 
-logger = logging.getLogger(__name__)
+from .config import get_timeout
 
-DEFAULT_TIMEOUT = 45.0
+logger = logging.getLogger(__name__)
 
 
 class DatacenterError(Exception):
@@ -41,16 +45,10 @@ class DatacenterError(Exception):
         self.api_url = api_url
 
 
-def _get_timeout() -> float:
-    """Request timeout in seconds, from the FDSN_TIMEOUT env var (default 45)."""
-    raw = os.environ.get("FDSN_TIMEOUT")
-    if not raw:
-        return DEFAULT_TIMEOUT
-    try:
-        return float(raw)
-    except ValueError:
-        logger.warning("Invalid FDSN_TIMEOUT=%r, using default %s", raw, DEFAULT_TIMEOUT)
-        return DEFAULT_TIMEOUT
+# Re-exported under its historical private name: the timeout reader moved to
+# ``config`` when the row limits joined it there, but tests and callers already
+# reach for this one.
+_get_timeout = get_timeout
 
 
 def _validate_datacenter(datacenter: str) -> None:
@@ -272,6 +270,14 @@ async def _get_events_quakeml(eventid: str, datacenter: str, **extra) -> tuple[C
     except FDSNNoDataException:
         logger.info("No data for eventid=%s (HTTP 204)", eventid)
         return (Catalog(), api_url)
+    except FDSNNotImplementedException as e:
+        # A subresource the provider does not implement (USGS answers 501 to
+        # includearrivals). Tagged with its status so a caller can decide to
+        # retry without the flag instead of parsing the message: the wording is
+        # the provider's, the status code is the contract.
+        raise DatacenterError(
+            str(e), status=501, datacenter=datacenter, api_url=api_url
+        ) from e
     except FDSNException as e:
         raise DatacenterError(str(e), datacenter=datacenter, api_url=api_url) from e
     except TypeError as e:
@@ -298,34 +304,94 @@ async def _get_events_quakeml(eventid: str, datacenter: str, **extra) -> tuple[C
     return (catalog, api_url)
 
 
-async def get_event_by_id(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
-    """Fetch a single event by ID (basic info: preferred origin/magnitude, station
-    magnitudes, amplitudes). Alternative origins/magnitudes/arrivals need the
-    specialized tools."""
+async def get_event_by_eventid(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
+    """Fetch a single event: preferred origin and magnitude, focal mechanisms.
+
+    Sends no include flags, so the response carries the preferred solution and
+    whatever the node volunteers alongside it. Arrivals, alternative origins and
+    magnitudes, station magnitudes and amplitudes each have their own tool.
+    """
     return await _get_events_quakeml(eventid, datacenter)
 
 
-async def get_arrivals_by_id(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
-    """Fetch a single event with all arrivals and picks."""
+async def get_arrivals_by_eventid(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
+    """Fetch a single event with all arrivals and picks.
+
+    ``includeallorigins`` is deliberately not sent: what comes back is whatever
+    the node returns for a plain event id plus arrivals. That is one origin on
+    INGV and six on EMSC, and the envelope reports ``origins_count`` so the
+    difference is visible instead of hidden.
+    """
     return await _get_events_quakeml(eventid, datacenter, includearrivals=True)
 
 
-async def get_allmagnitudes_by_id(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
+async def get_allmagnitudes_by_eventid(
+    eventid: str, datacenter: str = "INGV"
+) -> tuple[Catalog, str]:
     """Fetch a single event with all magnitude solutions."""
     return await _get_events_quakeml(eventid, datacenter, includeallmagnitudes=True)
 
 
-async def get_allorigins_by_id(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
+async def get_allorigins_by_eventid(
+    eventid: str, datacenter: str = "INGV"
+) -> tuple[Catalog, str]:
     """Fetch a single event with all origin solutions."""
     return await _get_events_quakeml(eventid, datacenter, includeallorigins=True)
 
 
-async def get_focalmechanism_by_id(eventid: str, datacenter: str = "INGV") -> tuple[Catalog, str]:
+async def get_focalmechanism_by_eventid(
+    eventid: str, datacenter: str = "INGV"
+) -> tuple[Catalog, str]:
     """Fetch a single event with focal mechanism data.
 
     Uses includeallmagnitudes=True because moment tensors are linked to magnitudes.
     """
     return await _get_events_quakeml(eventid, datacenter, includeallmagnitudes=True)
+
+
+async def get_stationmagnitudes_by_eventid(
+    eventid: str, datacenter: str = "INGV"
+) -> tuple[Catalog, str]:
+    """Fetch a single event with its station magnitudes."""
+    return await _get_station_level_quakeml(eventid, datacenter)
+
+
+async def get_amplitudes_by_eventid(
+    eventid: str, datacenter: str = "INGV"
+) -> tuple[Catalog, str]:
+    """Fetch a single event with its amplitudes."""
+    return await _get_station_level_quakeml(eventid, datacenter)
+
+
+async def _get_station_level_quakeml(
+    eventid: str, datacenter: str
+) -> tuple[Catalog, str]:
+    """Fetch station magnitudes and amplitudes, asking for arrivals to get them.
+
+    ``includearrivals`` looks irrelevant to a station magnitude, and on INGV it
+    is: the plain response already carries all 254. On EMSC it is the difference
+    between 114 station magnitudes and none, and between 274 amplitudes and
+    none. So the flag is always sent and the arrivals that come back with it are
+    dropped here; the cost is bandwidth inside the container, never context.
+
+    USGS answers 501 to that flag. Retrying without it is driven by the server's
+    own response rather than by its name, so the rule stays the same everywhere
+    so the rule reads the same on every node. USGS then returns no station
+    magnitudes and no amplitudes, which
+    the tool reports as an honest empty result rather than an error the caller
+    cannot act on.
+    """
+    try:
+        return await _get_events_quakeml(eventid, datacenter, includearrivals=True)
+    except DatacenterError as e:
+        if e.status != 501:
+            raise
+        logger.info(
+            "Datacenter %s does not implement includearrivals (HTTP 501); "
+            "retrying without it",
+            datacenter,
+        )
+        return await _get_events_quakeml(eventid, datacenter)
 
 
 def _items_with_preferred(items, preferred_id) -> list[dict]:

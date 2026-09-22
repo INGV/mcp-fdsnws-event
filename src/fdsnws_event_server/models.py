@@ -12,6 +12,8 @@ from pydantic import (
     model_validator,
 )
 
+from . import config
+
 # FDSN event identifiers are opaque, provider-defined strings, not numbers. Only
 # some providers happen to use decimal digits:
 #
@@ -48,7 +50,7 @@ def _coerce_eventid(value: object) -> object:
 _EVENTID_DESCRIPTION = (
     "FDSN event ID, as an opaque string. Identifier formats are provider-specific "
     "(e.g. INGV '37258271', EMSC '20240101_0000328', GFZ 'gfz2024abmz', "
-    "USGS 'us6000m0yg'), so copy the value VERBATIM from the EventID column of a "
+    "USGS 'us6000m0yg'), so copy the value VERBATIM from the event_id column of a "
     "prior fdsn_query_earthquakes result. Do NOT invent, guess, reformat, strip "
     "characters from, or use placeholder values."
 )
@@ -148,10 +150,13 @@ class QueryEarthquakesInput(BaseModel):
         description="Maximum radius in km for radial search",
     )
     limit: int = Field(
-        default=100,
+        default=config.DEFAULT_ROWS_EVENTS,
         ge=1,
-        le=1000,
-        description="Maximum number of events to return (default: 100)",
+        le=config.MAX_ROWS_EVENTS,
+        description=(
+            "Maximum number of events to return "
+            f"(default: {config.DEFAULT_ROWS_EVENTS}, max: {config.MAX_ROWS_EVENTS})"
+        ),
     )
     offset: int = Field(
         default=1,
@@ -214,7 +219,26 @@ class QueryEarthquakesInput(BaseModel):
         return self
 
 
-class GetEarthquakeByIdInput(BaseModel):
+
+
+# ---------------------------------------------------------------------------
+# By-event-id models
+# ---------------------------------------------------------------------------
+#
+# Every tool below takes an event id, which is why each is named for that input
+# rather than for the QuakeML class its rows come from. Arrivals and station
+# magnitudes belong to an Origin, not to an Event, so `_by_originid` was the
+# obvious name -- and the wrong one: no FDSN node accepts an origin id as a
+# query parameter, so the input would still have been an event id, and a tool
+# called `_by_originid` invites a model to invent an origin id. That is the
+# failure the opaque-string typing of `eventid` exists to prevent.
+
+_DATACENTER_FIELD_DESCRIPTION = "FDSN datacenter to query (e.g., INGV, EMSC, GFZ, USGS)"
+
+
+class _ByEventIdInput(BaseModel):
+    """Shared shape of every by-event-id tool input."""
+
     model_config = ConfigDict(
         validate_assignment=True,
         extra="forbid",
@@ -223,57 +247,101 @@ class GetEarthquakeByIdInput(BaseModel):
     eventid: EventId
     datacenter: str = Field(
         default="INGV",
-        description="FDSN datacenter to query (e.g., INGV, EMSC, GFZ, USGS)",
+        description=_DATACENTER_FIELD_DESCRIPTION,
     )
 
 
-class GetArrivalsByIdInput(BaseModel):
-    model_config = ConfigDict(
-        validate_assignment=True,
-        extra="forbid",
+class _TabularByEventIdInput(_ByEventIdInput):
+    """A by-event-id tool that returns a paginated table.
+
+    The station filters are applied by this server after the fetch, because no
+    FDSN event service filters a subresource by station. They exist so that
+    "the amplitude at station XYZ" costs one small answer instead of paging
+    through every reading of the event.
+    """
+
+    network: Optional[str] = Field(
+        default=None,
+        max_length=8,
+        description=(
+            "Filter rows by network code (exact, case-insensitive), e.g. 'IV'. "
+            "Applied after the fetch"
+        ),
     )
-
-    eventid: EventId
-    datacenter: str = Field(
-        default="INGV",
-        description="FDSN datacenter to query (e.g., INGV, EMSC, GFZ, USGS)",
+    station: Optional[str] = Field(
+        default=None,
+        max_length=8,
+        description=(
+            "Filter rows by station code (exact, case-insensitive), e.g. 'SGRT'. "
+            "Applied after the fetch"
+        ),
     )
-
-
-class GetAllOriginsByIdInput(BaseModel):
-    model_config = ConfigDict(
-        validate_assignment=True,
-        extra="forbid",
-    )
-
-    eventid: EventId
-    datacenter: str = Field(
-        default="INGV",
-        description="FDSN datacenter to query (e.g., INGV, EMSC, GFZ, USGS)",
-    )
-
-
-class GetAllMagnitudesByIdInput(BaseModel):
-    model_config = ConfigDict(
-        validate_assignment=True,
-        extra="forbid",
-    )
-
-    eventid: EventId
-    datacenter: str = Field(
-        default="INGV",
-        description="FDSN datacenter to query (e.g., INGV, EMSC, GFZ, USGS)",
+    offset: int = Field(
+        default=1,
+        ge=1,
+        description=(
+            "1-based index of the first row to return (default: 1). Page with "
+            "next_offset from the previous response"
+        ),
     )
 
 
-class GetFocalMechanismByIdInput(BaseModel):
-    model_config = ConfigDict(
-        validate_assignment=True,
-        extra="forbid",
+class GetEarthquakeByEventIdInput(_ByEventIdInput):
+    pass
+
+
+class GetAllOriginsByEventIdInput(_ByEventIdInput):
+    pass
+
+
+class GetAllMagnitudesByEventIdInput(_ByEventIdInput):
+    pass
+
+
+class GetFocalMechanismByEventIdInput(_ByEventIdInput):
+    pass
+
+
+class GetArrivalsByEventIdInput(_TabularByEventIdInput):
+    limit: int = Field(
+        default=config.DEFAULT_ROWS_ARRIVALS,
+        ge=1,
+        le=config.MAX_ROWS_ARRIVALS,
+        description=(
+            "Maximum number of arrival rows to return "
+            f"(default: {config.DEFAULT_ROWS_ARRIVALS}, max: {config.MAX_ROWS_ARRIVALS})"
+        ),
     )
 
-    eventid: EventId
-    datacenter: str = Field(
-        default="INGV",
-        description="FDSN datacenter to query (e.g., INGV, EMSC, GFZ, USGS)",
+
+class GetStationMagnitudesByEventIdInput(_TabularByEventIdInput):
+    magnitude_type: Optional[str] = Field(
+        default=None,
+        max_length=16,
+        description=(
+            "Filter rows by station magnitude type (exact, case-insensitive), "
+            "e.g. 'ML'. Useful where an origin carries more than one magnitude"
+        ),
+    )
+    limit: int = Field(
+        default=config.DEFAULT_ROWS_STATIONMAGNITUDES,
+        ge=1,
+        le=config.MAX_ROWS_STATIONMAGNITUDES,
+        description=(
+            "Maximum number of station magnitude rows to return "
+            f"(default: {config.DEFAULT_ROWS_STATIONMAGNITUDES}, "
+            f"max: {config.MAX_ROWS_STATIONMAGNITUDES})"
+        ),
+    )
+
+
+class GetAmplitudesByEventIdInput(_TabularByEventIdInput):
+    limit: int = Field(
+        default=config.DEFAULT_ROWS_AMPLITUDES,
+        ge=1,
+        le=config.MAX_ROWS_AMPLITUDES,
+        description=(
+            "Maximum number of amplitude rows to return "
+            f"(default: {config.DEFAULT_ROWS_AMPLITUDES}, max: {config.MAX_ROWS_AMPLITUDES})"
+        ),
     )
