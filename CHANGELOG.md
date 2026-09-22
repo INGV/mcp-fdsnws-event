@@ -1,5 +1,8 @@
 # Release Notes
 
+### Release 2.1.0-dev (2026-09-23)
+  - . . .
+
 ### Release 2.0.0 (2026-09-23)
   - fix: bound the size of every tool result, so that a single answer can no longer push the user's own question out of the model's context window. On Ollama 0.34.0 with `qwen3.8:27b` at a 32k context, asking for a table of arrivals returned a tool payload of 278800 bytes, many times the window on its own; the runtime drops messages from the front of the prompt until it fits, which left only that payload, and the qwen3.5 renderer then refused a prompt containing no user turn with `no user query found in messages`. The failure named neither the tool nor the size, and raising the context length did not fix it: the server has to bound its own output. The same question, on the same event (INGV `47219912`), now sends 31680 bytes for a first page of 90 arrival rows and gets HTTP 200 at 16907 prompt tokens, 52% of the window
   - feat: return station-level collections as a table (`columns` + `rows`) instead of a list of QuakeML objects. A table states each field name once instead of once per row, and the repeated `smi:` identifier boilerplate is lifted into an envelope-level `id_prefixes` map with only the remainder left in the rows, so prefix plus row value still reconstructs the identifier character for character. Measured on an INGV Mw 6.1 event, the arrivals of `fdsn_get_arrivals_by_eventid` go from 805 kB to 87 kB at the same information content. Breaking: callers that walked an `arrivals` array must be rewritten against the table
