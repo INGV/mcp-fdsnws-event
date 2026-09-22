@@ -14,11 +14,18 @@ earthquake information as JSON.
 ## Features
 
 - **Multi-datacenter**: works with any FDSN-compliant datacenter (INGV, EMSC, GFZ, USGS, and others)
-- **6 MCP tools**: event search, single-event detail, arrivals, magnitudes, origins, focal mechanisms
-- **Two output levels**: a compact tabular search result (from FDSN `format=text`) and a full
-  QuakeML→JSON detail for a single event (the `*_by_id` tools)
+- **8 MCP tools**: event search, single-event detail, arrivals, station magnitudes, amplitudes,
+  magnitudes, origins, focal mechanisms
+- **Two output shapes**: station-level collections (arrivals, station magnitudes, amplitudes,
+  event lists) come back as a paginated table (`columns` + `rows`); solution-level objects
+  (event, origins, magnitudes, focal mechanisms) come back as full QuakeML→JSON detail
+- **Context-budgeted**: every result is bounded in bytes so a single tool call cannot push the
+  user's own question out of an LLM's context window
 - **stdio transport**: JSON-RPC 2.0 over stdin/stdout
 - **Containerized**: ready to use with Docker
+
+> **Upgrading from 1.x?** Release 2.0.0 renames every event-keyed tool and changes the
+> response shape of three of them. See [Breaking changes in 2.0.0](#breaking-changes-in-200).
 
 ## Installation
 
@@ -92,15 +99,84 @@ recommended way to validate all functionality.
 
 ### Available tools
 
-The server exposes 6 tools. They all accept an optional `datacenter` parameter
+The server exposes 8 tools. They all accept an optional `datacenter` parameter
 (default: `"INGV"`). Supported datacenters: INGV, EMSC, GFZ, USGS, and other
 FDSN-compliant services.
+
+| Tool | Returns | Shape |
+|------|---------|-------|
+| [`fdsn_query_earthquakes`](#1-fdsn_query_earthquakes) | one row per event, preferred origin and magnitude | table |
+| [`fdsn_get_earthquake_by_eventid`](#2-fdsn_get_earthquake_by_eventid) | event, preferred origin, preferred magnitude, focal mechanisms, counts | QuakeML detail |
+| [`fdsn_get_arrivals_by_eventid`](#3-fdsn_get_arrivals_by_eventid) | phase arrivals, each joined with its pick | table |
+| [`fdsn_get_allorigins_by_eventid`](#4-fdsn_get_allorigins_by_eventid) | all origin solutions | QuakeML detail |
+| [`fdsn_get_allmagnitudes_by_eventid`](#5-fdsn_get_allmagnitudes_by_eventid) | all magnitude solutions | QuakeML detail |
+| [`fdsn_get_focalmechanism_by_eventid`](#6-fdsn_get_focalmechanism_by_eventid) | focal mechanisms and moment tensors | QuakeML detail |
+| [`fdsn_get_stationmagnitudes_by_eventid`](#7-fdsn_get_stationmagnitudes_by_eventid) | per-station magnitude readings, each joined with its amplitude | table |
+| [`fdsn_get_amplitudes_by_eventid`](#8-fdsn_get_amplitudes_by_eventid) | measured amplitudes | table |
 
 > **Note on IRIS.** IRIS/EarthScope no longer serves the FDSNWS *event* service:
 > both `service.iris.edu` and `service.earthscope.org` answer
 > `/fdsnws/event/1/query` with **HTTP 410 Gone**. It is therefore no longer
 > advertised here; USGS is the recommended global substitute. Station and
 > waveform services at EarthScope are unaffected (this server does not use them).
+
+#### Table responses
+
+Station-level collections have one entry per station reading, and an event can carry
+thousands of them. Serialized as a list of QuakeML objects they overflow an LLM context
+window on their own, so the four tools marked *table* above return a tabular payload
+instead: the field names are stated once in `columns`, and `rows` carries one list of
+values per record, in the same order. The column set is fixed per tool and always
+complete — a field the datacenter does not populate comes back as `null` rather than
+disappearing — so the shape does not change from one datacenter to the next.
+
+**Identifiers are split in two.** QuakeML identifiers are URIs of which almost every
+character is boilerplate repeated on every row, so the envelope carries an `id_prefixes`
+map from column name to the prefix shared by that column's values, and the rows carry
+only the remainder. The full identifier is the concatenation, character for character:
+
+```json
+{
+  "id_prefixes": {
+    "pick_id": "smi:webservices.ingv.it/fdsnws/event/1/query?pickId="
+  },
+  "columns": ["arrival_id", "pick_id", "phase", "..."],
+  "rows": [["...", "817336441", "Pg", "..."]]
+}
+```
+
+so the `pick_id` of that row is
+`smi:webservices.ingv.it/fdsnws/event/1/query?pickId=817336441`. A column with no
+worthwhile shared prefix is simply absent from the map and its rows already hold the
+complete value. Nothing is dropped: this is an encoding, not a summary.
+
+**Pagination.** Every table takes `limit` and `offset` (1-based) and answers with
+`returned_count`, `has_more` and, when there is more, `next_offset`. Page by resending
+the same call with `offset: next_offset` until `has_more` is false. `returned_count` can
+come back below the `limit` asked for: the byte budget described under
+[Configuration](#configuration) shrinks a page that would not fit rather than failing the
+call, and `next_offset` still lines up. The three event-keyed tables also report
+`total_count`, the number of rows matching the query once the filters below have been
+applied, next to a `<resource>_count` (`arrivals_count`, `station_magnitudes_count`,
+`amplitudes_count`) giving the size of the event's whole collection regardless of any
+filter — which is how an empty page saying "this event has none at all" is told apart from
+one saying "your filters matched none".
+
+**Filters.** The three event-keyed tables accept `network` and `station` (exact,
+case-insensitive), and the station-magnitude table also accepts `magnitude_type`. They are
+applied by this server after the fetch, because no FDSN event service filters a
+sub-resource by station; they exist so that "the amplitude at station SGRT" costs one
+small answer instead of paging through every reading of the event.
+
+**Every origin, not just the preferred one.** Arrival rows and station-magnitude rows span
+every origin the datacenter returned for the event, with `origin_id` naming the origin and
+`is_preferred_origin` marking the rows of the preferred solution, which are also sorted
+first. Filtering to the preferred origin would be invisible data loss: an EMSC event comes
+back with six origins carrying 137 preferred arrivals and 137 more elsewhere, while on INGV
+every arrival already sits on the preferred origin and the rule costs nothing. The envelope
+reports `origins_count` so the difference between datacenters is visible rather than
+hidden. Amplitudes belong to the event rather than to an origin in QuakeML, so they carry
+no `origin_id`.
 
 #### 1. `fdsn_query_earthquakes`
 
@@ -113,17 +189,29 @@ Search seismic events with flexible filters. With no parameters it returns today
 - `mindepth` / `maxdepth`: depth range (in km, the FDSN query-parameter unit)
 - `minlat` / `maxlat` / `minlon` / `maxlon`: geographic bounding box
 - `latitude` / `longitude` / `minradiuskm` / `maxradiuskm`: radial search
-- `limit`: maximum number of events (default: 100, max: 1000)
+- `limit`: maximum number of events (default: 100, max: 240 — both configurable, see
+  [Configuration](#configuration))
 - `offset`: 1-based index of the first event (default: 1), to paginate together with `limit`
 - `orderby`: sort order — `time` (default, most recent first), `time-asc`, `magnitude`, `magnitude-asc`
 - `datacenter`: FDSN datacenter to query (default: `"INGV"`, overridable)
 
 > **Note:** the bounding-box parameters and the radial-search parameters are mutually exclusive.
 
-**Output:** a compact tabular result (`columns` + `rows`, one row per event with the
-preferred origin/magnitude; **depth in km**) plus a `pagination` block
-(`returned_count`, `has_more`, `next_offset`). For the full detail of a single event,
-use the `*_by_id` tools (complete QuakeML, depth in meters).
+**Output:** a table (`columns` + `rows`, one row per event with the preferred origin and
+magnitude; **depth in km**). `returned_count`, `limit`, `offset`, `has_more` and
+`next_offset` sit at the top level of the response, next to a `query` echo of the
+parameters actually sent upstream. The column names are normalised to the fourteen names
+of the FDSN 1.2 text profile (`event_id`, `time`, `latitude`, `longitude`, `depth_km`,
+`author`, `catalog`, `contributor`, `contributor_id`, `mag_type`, `magnitude`,
+`mag_author`, `location_name`, `event_type`), because the datacenters spell their own
+header differently — INGV writes `Depth/Km`, EMSC, GFZ and USGS write `Depth/km`, and
+`EventType` is absent from EMSC and USGS entirely — and a column name that depends on who
+answered is not something a client can be written against. An unrecognised column is
+lowercased and passed through rather than dropped.
+
+Unlike the event-keyed tables this one has no `total_count`: FDSN text carries no count,
+so `has_more` is inferred from the page having been filled exactly. For the detail of a
+single event use the `*_by_eventid` tools.
 
 **Examples:**
 
@@ -144,58 +232,121 @@ use the `*_by_id` tools (complete QuakeML, depth in meters).
 {"minmag": 5.0, "starttime": "2025-01-01T00:00:00", "datacenter": "USGS"}
 ```
 
-#### 2. `fdsn_get_earthquake_by_id`
+#### 2. `fdsn_get_earthquake_by_eventid`
 
-Returns the basic information for a single event: preferred origin, preferred magnitude,
-station magnitudes, and amplitudes.
+Returns the core information for a single event: the event metadata, the preferred origin,
+the preferred magnitude and the focal mechanisms, as full QuakeML detail. Note that the
+preferred magnitude does not always belong to the preferred origin — on INGV event
+`46107472` the preferred Mw 6.1 hangs off one origin while the preferred origin carries an
+ML 6.2 — so `preferred_origin_id` and `preferred_magnitude_id` are both reported
+explicitly.
+
+**Station-level collections are no longer inlined.** Picks, amplitudes and station
+magnitudes used to be serialized into this response, which is what made it the largest
+answer this server could produce: 3510 kB for one INGV Mw 6.1 event, of which 1886 kB was
+amplitudes alone. They now live in dedicated tools, and this response reports
+`station_magnitudes_count` and `amplitudes_count` so a caller knows whether there is
+anything to fetch. There is deliberately no `arrivals_count`: this fetch does not send
+`includearrivals`, so every origin comes back with an empty arrival list, and a count
+taken from it would read as a confident "this event has no phases" — ask
+`fdsn_get_arrivals_by_eventid`, which does know.
 
 **Parameters:**
-- `eventid` (required): event identifier, as returned by `fdsn_query_earthquakes`.
-  Treated as an opaque string matching `^[A-Za-z0-9_.:-]+$`, so the differing
-  conventions of the providers are all accepted (`45376822` at INGV,
+- `eventid` (required): event identifier, as returned by `fdsn_query_earthquakes` in the
+  `event_id` column. Treated as an opaque string matching `^[A-Za-z0-9_.:-]+$`, so the
+  differing conventions of the providers are all accepted (`45376822` at INGV,
   `20240101_0000328` at EMSC, `gfz2024abmz` at GFZ, `us6000m0yg` at USGS). A JSON
   integer is still accepted and normalised.
 - `datacenter` (optional): default `"INGV"`
 
-#### 3. `fdsn_get_arrivals_by_id`
+#### 3. `fdsn_get_arrivals_by_eventid`
 
-Returns all seismic phase arrivals for an event, with the associated picks (station,
-arrival time, phase). Useful to know which stations recorded the event.
+Returns the seismic phase arrivals of an event as a table, each row joined with the pick it
+associates (station, time, phase, residual). Useful to know which stations recorded the
+event and what was read on them.
 
-**Parameters:**
-- `eventid` (required): opaque event identifier, as described for
-  `fdsn_get_earthquake_by_id` above.
-- `datacenter` (optional): default `"INGV"`
-
-#### 4. `fdsn_get_allmagnitudes_by_id`
-
-Returns all magnitude solutions computed for an event (ML, Mw, Mb, Md, etc.), indicating
-which one is preferred. Useful for comparing magnitude types or agencies.
+Rows are ordered by distance from the hypocentre when the datacenter provides it —
+the order a seismologist reads a phase list in — and by pick time otherwise, with the
+preferred-origin rows first either way; `ordered_by` in the response says which was used.
 
 **Parameters:**
 - `eventid` (required): opaque event identifier, as described for
-  `fdsn_get_earthquake_by_id` above.
+  `fdsn_get_earthquake_by_eventid` above.
 - `datacenter` (optional): default `"INGV"`
+- `network` / `station` (optional): exact, case-insensitive row filters
+- `limit` (optional): default 90, max 90 (configurable)
+- `offset` (optional): 1-based, default 1
 
-#### 5. `fdsn_get_allorigins_by_id`
+#### 4. `fdsn_get_allorigins_by_eventid`
 
-Returns all origin solutions (hypocenter locations) for an event, indicating which one is
+Returns all origin solutions (hypocentre locations) for an event, indicating which one is
 preferred. Useful to compare locations computed by different agencies.
 
 **Parameters:**
 - `eventid` (required): opaque event identifier, as described for
-  `fdsn_get_earthquake_by_id` above.
+  `fdsn_get_earthquake_by_eventid` above.
 - `datacenter` (optional): default `"INGV"`
 
-#### 6. `fdsn_get_focalmechanism_by_id`
+#### 5. `fdsn_get_allmagnitudes_by_eventid`
+
+Returns all magnitude solutions computed for an event (ML, Mw, Mb, Md, etc.), indicating
+which one is preferred. Useful for comparing magnitude types or agencies. For the
+per-station readings behind a magnitude use `fdsn_get_stationmagnitudes_by_eventid`.
+
+**Parameters:**
+- `eventid` (required): opaque event identifier, as described for
+  `fdsn_get_earthquake_by_eventid` above.
+- `datacenter` (optional): default `"INGV"`
+
+#### 6. `fdsn_get_focalmechanism_by_eventid`
 
 Returns the focal mechanisms and moment tensors for an event: nodal planes (strike, dip,
 rake), principal axes (T, P, N), and moment tensor components.
 
 **Parameters:**
 - `eventid` (required): opaque event identifier, as described for
-  `fdsn_get_earthquake_by_id` above.
+  `fdsn_get_earthquake_by_eventid` above.
 - `datacenter` (optional): default `"INGV"`
+
+#### 7. `fdsn_get_stationmagnitudes_by_eventid`
+
+Returns the per-station magnitude readings of an event as a table, each row joined with the
+amplitude it was computed from. Useful when asked which stations contributed to a
+magnitude, or for the magnitude measured at one station.
+
+A station magnitude belongs to an origin, given by `origin_id`; where an origin carries
+more than one magnitude, `station_magnitude_type` tells the readings apart and can be
+filtered on. Rows are ordered by network, station and channel. Not every datacenter
+publishes these: an empty table with a `message` means the event exists but carries none.
+
+**Parameters:**
+- `eventid` (required): opaque event identifier, as described for
+  `fdsn_get_earthquake_by_eventid` above.
+- `datacenter` (optional): default `"INGV"`
+- `network` / `station` (optional): exact, case-insensitive row filters
+- `magnitude_type` (optional): exact, case-insensitive filter on `station_magnitude_type`
+- `limit` (optional): default 200, max 220 (configurable)
+- `offset` (optional): 1-based, default 1
+
+#### 8. `fdsn_get_amplitudes_by_eventid`
+
+Returns the measured amplitudes of an event as a table: value, unit, period, signal-to-noise
+ratio, time window and station. Useful when asked what was recorded, or for the amplitude
+measured at one station.
+
+In QuakeML an amplitude belongs to the event rather than to an origin, so all of them are
+returned and many are not referenced by any station magnitude — of the 2152 amplitudes on
+the INGV event measured, only 677 were. Rows are ordered by network, station and channel.
+Not every datacenter publishes them: an empty table with a `message` means the event exists
+but carries none.
+
+**Parameters:**
+- `eventid` (required): opaque event identifier, as described for
+  `fdsn_get_earthquake_by_eventid` above.
+- `datacenter` (optional): default `"INGV"`
+- `network` / `station` (optional): exact, case-insensitive row filters
+- `limit` (optional): default 125, max 125 (configurable)
+- `offset` (optional): 1-based, default 1
 
 ## MCP client configuration
 
@@ -212,6 +363,149 @@ configuration:
   }
 }
 ```
+
+To tune the server from here, pass the variables as `-e` flags among the `args`; see
+[Configuration](#configuration) for why the client's `env` key does not reach the
+container.
+
+## Configuration
+
+The server is configured entirely through environment variables. There is no
+configuration file and nothing is read from a `.env` file inside the process: the
+variables have to be present in the container's environment.
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `FDSN_TIMEOUT` | `45` | Timeout in seconds for a request to the datacenter. Read per call |
+| `FDSN_MAX_RESULT_BYTES` | `36000` | Byte budget for a single tool result |
+| `FDSN_MAX_ROWS_ARRIVALS` | `90` | Largest `limit` accepted by `fdsn_get_arrivals_by_eventid` |
+| `FDSN_DEFAULT_ROWS_ARRIVALS` | `90` | `limit` used when the caller does not give one |
+| `FDSN_MAX_ROWS_STATIONMAGNITUDES` | `220` | Largest `limit` accepted by `fdsn_get_stationmagnitudes_by_eventid` |
+| `FDSN_DEFAULT_ROWS_STATIONMAGNITUDES` | `200` | `limit` used when the caller does not give one |
+| `FDSN_MAX_ROWS_AMPLITUDES` | `125` | Largest `limit` accepted by `fdsn_get_amplitudes_by_eventid` |
+| `FDSN_DEFAULT_ROWS_AMPLITUDES` | `125` | `limit` used when the caller does not give one |
+| `FDSN_MAX_ROWS_EVENTS` | `240` | Largest `limit` accepted by `fdsn_query_earthquakes` |
+| `FDSN_DEFAULT_ROWS_EVENTS` | `100` | `limit` used when the caller does not give one |
+
+`.env.example` lists the same set, ready to copy to `.env` and pass with `--env-file`.
+
+**Where the numbers come from.** `FDSN_MAX_RESULT_BYTES` is a context budget rather than a
+storage limit, and both halves of the derivation are measured rather than assumed. The
+density of this JSON is **1.87 bytes per token**: the slope of `prompt_eval_count` against
+payload size measured on `qwen3.8:27b` under Ollama, 1511 bytes costing 476 tokens and
+48 667 costing 25 744, linear in between. At that density 36 000 bytes is about 19 250
+tokens, 59% of a 32k context window, leaving the rest for the conversation the result has to
+live inside. Each table's maximum is then that budget divided by the widest row the finished
+tool actually emitted against INGV, EMSC, GFZ and USGS — 391 B/row for arrivals (GFZ, whose
+opaque identifiers share almost no prefix to lift out), 159 for station magnitudes, 279 for
+amplitudes, 149 for events. The byte budget is the backstop underneath the row limits, not
+the first line of defence: on a table it shrinks the page and sets `has_more`, so the call
+still succeeds; on a solution-level object, which cannot be split, it returns a structured
+error naming the size and pointing at the table tools.
+
+These figures are calibrated for a 32k window, because that is the window of the deployment
+this release was written for. **A larger window is exactly what these variables are there to
+be raised for**: the numbers are policy, not a property of the data.
+
+**Two things to know before changing a `MAX_ROWS_*`.** They are read once at import, because
+each one is published as the `maximum` of that tool's `limit` parameter in the JSON schema
+this server advertises in `tools/list` — they are not only what the server honours but what
+the model is *told* it may ask for. So the container must be restarted for a change to take
+effect, and any client that caches the tool schema has to be refreshed too: behind mcpo the
+OpenAPI spec is generated at startup, so an Open WebUI tool server must be re-imported
+before the new maximum is visible. A value that is not a positive integer is ignored with a
+warning and the default is used; a `DEFAULT_ROWS_*` above its own `MAX_ROWS_*` is clamped
+down with a warning rather than taking the server down on a config typo.
+
+### Setting the variables
+
+**1. Plain `docker run`** — how a stdio deployment normally runs:
+
+```bash
+docker run -i --rm \
+  -e FDSN_TIMEOUT=60 \
+  -e FDSN_MAX_ROWS_ARRIVALS=90 \
+  ingv/mcp-fdsnws-event
+
+# or, once repeating -e flags gets unwieldy
+cp .env.example .env    # then edit
+docker run -i --rm --env-file .env ingv/mcp-fdsnws-event
+```
+
+**2. The `mcpServers` JSON of an MCP client.** Mind the trap here: the `env` key of an
+`mcpServers` entry sets the environment of the process the client spawns, which is the
+`docker` binary — **not** the container it starts. Docker does not forward its own
+environment into the container, so a variable placed in `env` silently has no effect. It
+has to be carried in explicitly with `-e NAME=value` among the `args`:
+
+```json
+{
+  "mcpServers": {
+    "fdsnws-event": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "FDSN_MAX_RESULT_BYTES=36000",
+        "-e", "FDSN_MAX_ROWS_ARRIVALS=90",
+        "ingv/mcp-fdsnws-event"
+      ]
+    }
+  }
+}
+```
+
+(The `env` key is still the right place for variables meant for the `docker` client itself,
+such as `DOCKER_HOST`.)
+
+**3. Compose.** Both `compose.yml` and `compose.mcpo.yml` carry an `environment:` block
+listing the whole set, commented out at its default; uncomment what you want to change.
+The `mcpo` image runs the server as a child process inside the container, so there is no
+`docker` binary in between and `environment:` — or `docker run -e` on that image — reaches
+the server directly.
+
+## Breaking changes in 2.0.0
+
+Release 2.0.0 changes the tool surface. **Every mcpo and Open WebUI registration has to be
+refreshed**, because the callable names change: in Open WebUI the generated names become
+`tool_fdsn_get_arrivals_by_eventid_post` and so on, and a tool server imported before the
+upgrade keeps advertising names that no longer exist.
+
+**Tools renamed.** Every tool that takes an event identifier is now named `_by_eventid`,
+after the input the caller must supply rather than after the QuakeML class the data comes
+from. Naming a tool for a class it cannot be queried by — arrivals belong to an origin, but
+no FDSN node accepts an origin id — invites a model to invent an identifier, which is the
+exact failure this server already guards against elsewhere.
+
+| 1.x | 2.0.0 |
+|-----|-------|
+| `fdsn_get_earthquake_by_id` | `fdsn_get_earthquake_by_eventid` |
+| `fdsn_get_arrivals_by_id` | `fdsn_get_arrivals_by_eventid` |
+| `fdsn_get_allorigins_by_id` | `fdsn_get_allorigins_by_eventid` |
+| `fdsn_get_allmagnitudes_by_id` | `fdsn_get_allmagnitudes_by_eventid` |
+| `fdsn_get_focalmechanism_by_id` | `fdsn_get_focalmechanism_by_eventid` |
+| — | `fdsn_get_stationmagnitudes_by_eventid` (new) |
+| — | `fdsn_get_amplitudes_by_eventid` (new) |
+
+`fdsn_query_earthquakes` keeps its name.
+
+**Response shape.** `fdsn_get_arrivals_by_eventid` no longer returns a list of QuakeML
+objects: it returns `columns` + `rows` + `id_prefixes` with `limit`/`offset` pagination,
+like the two new tools. Callers that walked an `arrivals` array must be rewritten against
+the table.
+
+**Flattened envelope on `fdsn_query_earthquakes`.** `returned_count`, `limit`, `offset`,
+`has_more` and `next_offset` are now top-level keys of the response instead of a nested
+`pagination` object, so all four tables share the same pagination keys.
+
+**Normalized event column names.** `fdsn_query_earthquakes` no longer passes the
+datacenter's own text header through. Columns are mapped to the FDSN 1.2 names, so
+`Depth/Km` (INGV) and `Depth/km` (EMSC, GFZ, USGS) both become `depth_km`, `EventID`
+becomes `event_id`, `EventLocationName` becomes `location_name`, and so on. Code that
+indexed the header by its INGV spelling must be updated.
+
+**No more station-level collections in `fdsn_get_earthquake_by_eventid`.** Picks,
+amplitudes and station magnitudes are gone from that response; use the dedicated tools.
+`station_magnitudes_count` and `amplitudes_count` are reported so you know whether to ask.
 
 ## Example queries
 
@@ -240,6 +534,8 @@ mcp-fdsnws-event/
 │   ├── __init__.py
 │   ├── server.py          # MCP server (FastMCP tool definitions)
 │   ├── models.py          # Pydantic input validation models
+│   ├── config.py          # Env-driven limits (byte budget, row maxima/defaults)
+│   ├── tables.py          # Tabular serialization: columns, rows, id prefixes, paging
 │   └── obspy_client.py    # FDSN format=text query + ObsPy QuakeML→JSON detail
 ├── tests/                 # pytest: unit (offline) + integration (live)
 │   ├── fixtures/          # Real FDSN format=text responses
@@ -332,9 +628,9 @@ In OpenWebUI go to **Settings → Integrations** (or for _all_ users, **Admin Pa
 ### Validating tool-call reliability (A/B harness)
 
 When a client model loses an identifier across turns it may *invent* one — e.g.
-calling `fdsn_get_arrivals_by_id` with a placeholder `eventid` (`123456`) instead
-of the `EventID` returned by a prior `fdsn_query_earthquakes`. The server guards
-against this with a three-state by-id contract (`found` / `message`), but the
+calling `fdsn_get_arrivals_by_eventid` with a placeholder `eventid` (`123456`) instead
+of the `event_id` returned by a prior `fdsn_query_earthquakes`. The server guards
+against this with a three-state by-eventid contract (`found` / `message`), but the
 behaviour itself lives in the OpenWebUI ↔ model loop and is best measured
 empirically.
 

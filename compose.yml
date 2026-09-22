@@ -6,6 +6,21 @@ services:
     container_name: fdsnws-event-mcp-server
     stdin_open: true
     tty: true
+    # Every knob this server has, at its default. Uncomment to change one.
+    # The MAX_ROWS_* values are read once at startup and become part of the tool
+    # schema the server advertises, so a change needs a restart of this service
+    # and a refresh of any client that caches that schema.
+    # environment:
+    #   - FDSN_TIMEOUT=45                        # upstream request timeout, seconds
+    #   - FDSN_MAX_RESULT_BYTES=36000            # byte budget for one tool result
+    #   - FDSN_MAX_ROWS_ARRIVALS=90
+    #   - FDSN_DEFAULT_ROWS_ARRIVALS=90
+    #   - FDSN_MAX_ROWS_STATIONMAGNITUDES=220
+    #   - FDSN_DEFAULT_ROWS_STATIONMAGNITUDES=200
+    #   - FDSN_MAX_ROWS_AMPLITUDES=125
+    #   - FDSN_DEFAULT_ROWS_AMPLITUDES=125
+    #   - FDSN_MAX_ROWS_EVENTS=240
+    #   - FDSN_DEFAULT_ROWS_EVENTS=100
     networks:
       - mcp-network
 

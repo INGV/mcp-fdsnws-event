@@ -19,6 +19,19 @@ services:
     # Optional: protect the endpoint with an API key (then set the same key in OpenWebUI).
     # command: ["mcpo", "--host", "0.0.0.0", "--port", "8000", "--api-key", "change-me",
     #           "--", "python", "-m", "fdsnws_event_server.server"]
-    # Optional: tune the upstream FDSN request timeout (seconds).
+    # Optional: every knob this server has, at its default. Uncomment to change one.
+    # mcpo runs the server as a child process inside this container, so these reach
+    # it directly. The MAX_ROWS_* values are read once at startup and become part of
+    # the OpenAPI spec mcpo generates, so after a change restart this service AND
+    # re-import the tool server in OpenWebUI, which caches that spec.
     # environment:
-    #   - FDSN_TIMEOUT=45
+    #   - FDSN_TIMEOUT=45                        # upstream request timeout, seconds
+    #   - FDSN_MAX_RESULT_BYTES=36000            # byte budget for one tool result
+    #   - FDSN_MAX_ROWS_ARRIVALS=90
+    #   - FDSN_DEFAULT_ROWS_ARRIVALS=90
+    #   - FDSN_MAX_ROWS_STATIONMAGNITUDES=220
+    #   - FDSN_DEFAULT_ROWS_STATIONMAGNITUDES=200
+    #   - FDSN_MAX_ROWS_AMPLITUDES=125
+    #   - FDSN_DEFAULT_ROWS_AMPLITUDES=125
+    #   - FDSN_MAX_ROWS_EVENTS=240
+    #   - FDSN_DEFAULT_ROWS_EVENTS=100

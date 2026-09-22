@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""A/B harness: does the model reuse the correct EventID, or hallucinate one?
+"""A/B harness: does the model reuse the correct event id, or hallucinate one?
 
 Reproduces the OpenWebUI failure mode in isolation. It replays the conversation
 up to the follow-up question ("how many arrivals for the M2.5 event?") with the
 prior fdsn_query_earthquakes tabular result already in context, then offers the
-by-id tool and inspects which ``eventid`` the model passes.
+by-eventid tool and inspects which ``eventid`` the model passes.
 
 It compares two tool-description variants:
   - baseline : the old bare "FDSN event ID" description (no provenance hint)
@@ -21,6 +21,12 @@ Usage:
         --repeat 10 --variant both --temperature 0.7
 
 Requires network access to the OpenWebUI instance. Not collected by pytest.
+
+Tracks the 2.0.0 tool surface: the tool is ``fdsn_get_arrivals_by_eventid``,
+``eventid`` is an opaque string rather than an integer, and the recorded
+query result carries the normalized FDSN 1.2 column names. Those are
+transcriptions of what the server now publishes, not changes to the experiment: the
+two variants still differ in the ``eventid`` description and in nothing else.
 """
 
 import argparse
@@ -31,15 +37,18 @@ from collections import Counter
 
 import requests
 
-# The correct answer: EventID of the M2.5 event from the recorded query result.
-CORRECT_EVENTID = 46166442
+# The correct answer: event_id of the M2.5 event from the recorded query result.
+# A string, not an integer: event ids are opaque provider-specific tokens and the
+# tool schema types them as strings, so the comparison has to be a string one too.
+CORRECT_EVENTID = "46166442"
 
 # Recorded fdsn_query_earthquakes result (orderby=magnitude), trimmed to the
-# columns that matter for the follow-up question.
+# columns that matter for the follow-up question. Column names are the normalized
+# FDSN 1.2 ones the server now emits; the values are unchanged from the recording.
 QUERY_RESULT = {
     "datacenter": "INGV",
-    "columns": ["EventID", "Time", "Latitude", "Longitude", "Depth/Km",
-                "MagType", "Magnitude", "EventLocationName"],
+    "columns": ["event_id", "time", "latitude", "longitude", "depth_km",
+                "mag_type", "magnitude", "location_name"],
     "rows": [
         ["46166442", "2026-06-09T04:43:13.930000", "44.4908", "9.5997", "7.2", "ML", "2.5", "2 km W Tornolo (PR)"],
         ["46167402", "2026-06-09T06:13:24.380000", "44.4973", "9.5862", "7.2", "ML", "2.4", "3 km W Tornolo (PR)"],
@@ -49,11 +58,30 @@ QUERY_RESULT = {
     ],
 }
 
+# Only this pair differs between the two arms of the experiment. The "fixed" text is
+# the shipped one, quoted from the server's own _EVENTID_NOTE so the measurement
+# keeps describing what is deployed.
+#
+# That quotation was re-synchronised in 2.0.0 and the previous wording is recorded
+# here rather than lost, because the run this harness first produced is cited in a
+# published paper and a reader must be able to see exactly what was measured then:
+#
+#     "Numeric FDSN event ID. MUST be taken from the EventID column of a prior
+#      fdsn_query_earthquakes result. Never invent or guess an ID."
+#
+# It was replaced, not edited for taste: 2.0.0 types eventid as an opaque string
+# and renames the column to event_id, so the old text
+# contradicted the schema it was attached to on both counts. An arm whose prompt
+# describes a tool that no longer exists measures nothing. Re-running this harness
+# therefore reproduces the *method* of the published experiment against the current
+# server, not its exact stimulus; to reproduce the original stimulus, restore the
+# text above together with "type": "integer" on the eventid property.
 EVENTID_DESC = {
     "baseline": "FDSN event ID",
     "fixed": (
-        "Numeric FDSN event ID. MUST be taken from the EventID column of a prior "
-        "fdsn_query_earthquakes result. Do NOT invent, guess, or use placeholder values."
+        "The eventid is an opaque, provider-specific string and MUST be copied "
+        "verbatim from a prior fdsn_query_earthquakes result (event_id column). "
+        "Never invent, guess, reformat, or use placeholder values."
     ),
 }
 
@@ -62,7 +90,7 @@ def arrivals_tool(variant: str) -> dict:
     return {
         "type": "function",
         "function": {
-            "name": "fdsn_get_arrivals_by_id",
+            "name": "fdsn_get_arrivals_by_eventid",
             "description": (
                 "Get all seismic phase arrivals for an earthquake event, including "
                 "linked pick data (station, time, phase)."
@@ -70,7 +98,7 @@ def arrivals_tool(variant: str) -> dict:
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "eventid": {"type": "integer", "description": EVENTID_DESC[variant]},
+                    "eventid": {"type": "string", "description": EVENTID_DESC[variant]},
                     "datacenter": {"type": "string", "default": "INGV"},
                 },
                 "required": ["eventid"],
@@ -135,7 +163,7 @@ def call(base_url: str, api_key: str, model: str, variant: str, temperature: flo
     msg = resp.json()["choices"][0]["message"]
     tcs = msg.get("tool_calls") or []
     for tc in tcs:
-        if tc.get("function", {}).get("name") == "fdsn_get_arrivals_by_id":
+        if tc.get("function", {}).get("name") == "fdsn_get_arrivals_by_eventid":
             try:
                 args = json.loads(tc["function"]["arguments"])
             except (KeyError, json.JSONDecodeError):
@@ -152,7 +180,10 @@ def run_variant(base_url, api_key, model, variant, repeat, temperature) -> Count
         except requests.RequestException as e:
             eid = f"HTTP_ERROR:{e.__class__.__name__}"
         seen[str(eid)] += 1
-        ok = eid == CORRECT_EVENTID
+        # Compared as strings: a model handed a string-typed schema still sometimes
+        # emits the bare number, and scoring that as a miss would report a failure
+        # the experiment is not measuring.
+        ok = str(eid) == CORRECT_EVENTID
         print(f"  [{variant}] {i + 1}/{repeat}: eventid={eid} {'OK' if ok else 'X'}")
     return seen
 

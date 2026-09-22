@@ -22,6 +22,9 @@ htmlcov/
 # OS / editor
 .DS_Store
 
+# Local environment (.env.example is committed, .env is not)
+.env
+
 # Local planning / working notes and assistant files (not versioned)
 plan/
 tasks/
