@@ -65,14 +65,203 @@ EventId = Annotated[
         max_length=64,
         pattern=_EVENTID_PATTERN,
         description=_EVENTID_DESCRIPTION,
+        # Restated for the published schema. Pydantic drops `pattern` from the
+        # JSON schema of any type carrying a BeforeValidator, reasonably enough:
+        # a validator may rewrite the input, so a constraint on the validated
+        # value need not describe what a caller may send. Here the validator only
+        # turns an integer into its digits, which the pattern already allows, so
+        # the constraint does describe valid input -- and a caller that cannot
+        # see it is the caller that sends `4.7219912e+07`.
+        json_schema_extra={"pattern": _EVENTID_PATTERN},
     ),
 ]
 
-# What the MCP tool signatures accept, before EventId normalizes it. Declaring the
-# union (rather than plain str) keeps the generated JSON schema tolerant of the
-# integer that the old schema taught clients to send. Pydantic's smart union leaves
-# a string as a string, so an EMSC identifier is never routed through int.
-EventIdInput = Union[int, str]
+# ---------------------------------------------------------------------------
+# Parameter types, shared by the validation models and the tool signatures
+# ---------------------------------------------------------------------------
+#
+# These exist because a Pydantic model is NOT what the MCP client sees. FastMCP
+# builds each tool's published JSON schema from the decorated function's
+# signature; the model below only validates what arrives. So for 2.0.0 every
+# constraint and description written here reached no one: the schema advertised
+# a bare `{"anyOf": [{"type": "integer"}, {"type": "string"}]}` for `eventid`,
+# with no pattern and none of the wording telling a caller to copy the value
+# verbatim. A model then sent `4.7219912e+07` -- the right event id, formatted
+# as a float, because the schema had told it the field was a number and nothing
+# had told it otherwise. The value was rejected, correctly, but only after a
+# wasted round trip.
+#
+# Declaring each parameter once here and annotating both the model field and the
+# function parameter with it means the published schema and the validation can
+# no longer disagree; `test_published_schema_matches_models` pins that.
+
+EventId = Annotated[
+    str,
+    BeforeValidator(_coerce_eventid),
+    Field(
+        min_length=1,
+        max_length=64,
+        pattern=_EVENTID_PATTERN,
+        description=_EVENTID_DESCRIPTION,
+        # Restated for the published schema. Pydantic drops `pattern` from the
+        # JSON schema of any type carrying a BeforeValidator, reasonably enough:
+        # a validator may rewrite the input, so a constraint on the validated
+        # value need not describe what a caller may send. Here the validator only
+        # turns an integer into its digits, which the pattern already allows, so
+        # the constraint does describe valid input -- and a caller that cannot
+        # see it is the caller that sends `4.7219912e+07`.
+        json_schema_extra={"pattern": _EVENTID_PATTERN},
+    ),
+]
+
+# `str`, not `Union[int, str]`. The integer branch was backward compatibility for
+# clients primed by the pre-1.4 schema, and publishing it invited exactly the
+# numeric formatting that ADR-0007 exists to prevent. The BeforeValidator still
+# accepts an integer at runtime, so nothing that used to work stops working; the
+# difference is that the schema no longer suggests it.
+EventIdInput = EventId
+
+DataCenter = Annotated[
+    str,
+    Field(
+        description=(
+            "FDSN datacenter to query. Known values: INGV (default), EMSC, GFZ, "
+            "USGS, and the other identifiers ObsPy maps. Default INGV is an "
+            "overridable convenience, not a binding"
+        ),
+    ),
+]
+
+StartTime = Annotated[
+    Optional[str],
+    Field(description="Start time in YYYY-MM-DDTHH:MM:SS format (default: today 00:00:00)"),
+]
+EndTime = Annotated[
+    Optional[str],
+    Field(description="End time in YYYY-MM-DDTHH:MM:SS format (default: today 23:59:59)"),
+]
+UpdatedAfter = Annotated[
+    Optional[str],
+    Field(description="Return events updated after this time (ISO 8601: YYYY-MM-DDTHH:MM:SS)"),
+]
+
+MinMag = Annotated[
+    Optional[float],
+    Field(ge=-2.0, le=10.0, description="Minimum magnitude (e.g., 4.0 for significant events)"),
+]
+MaxMag = Annotated[Optional[float], Field(ge=-2.0, le=10.0, description="Maximum magnitude")]
+
+MinLat = Annotated[
+    Optional[float],
+    Field(ge=-90.0, le=90.0, description="Minimum latitude (WGS84), for bounding-box filtering"),
+]
+MaxLat = Annotated[
+    Optional[float],
+    Field(ge=-90.0, le=90.0, description="Maximum latitude (WGS84), for bounding-box filtering"),
+]
+MinLon = Annotated[
+    Optional[float],
+    Field(ge=-180.0, le=180.0, description="Minimum longitude (WGS84), for bounding-box filtering"),
+]
+MaxLon = Annotated[
+    Optional[float],
+    Field(ge=-180.0, le=180.0, description="Maximum longitude (WGS84), for bounding-box filtering"),
+]
+
+MinDepth = Annotated[Optional[float], Field(ge=0.0, description="Minimum depth in kilometers")]
+MaxDepth = Annotated[Optional[float], Field(ge=0.0, description="Maximum depth in kilometers")]
+
+Latitude = Annotated[
+    Optional[float],
+    Field(ge=-90.0, le=90.0, description="Center latitude for radial search (WGS84)"),
+]
+Longitude = Annotated[
+    Optional[float],
+    Field(ge=-180.0, le=180.0, description="Center longitude for radial search (WGS84)"),
+]
+MinRadiusKm = Annotated[
+    Optional[float], Field(ge=0.0, description="Minimum radius in km for radial search")
+]
+MaxRadiusKm = Annotated[
+    Optional[float], Field(ge=0.0, description="Maximum radius in km for radial search")
+]
+
+OrderBy = Annotated[
+    Literal["time", "time-asc", "magnitude", "magnitude-asc"],
+    Field(
+        description=(
+            "Sort order of results: time (most recent first, default), time-asc, "
+            "magnitude (largest first), magnitude-asc"
+        ),
+    ),
+]
+
+EventsOffset = Annotated[
+    int,
+    Field(
+        ge=1,
+        description=(
+            "1-based index of the first event to return, per the FDSN spec "
+            "(default: 1). Use with limit to page: next_offset = offset + "
+            "returned_count. Note: offset indexing follows the datacenter "
+            "implementation"
+        ),
+    ),
+]
+
+NetworkFilter = Annotated[
+    Optional[str],
+    Field(
+        max_length=8,
+        description=(
+            "Filter rows by network code (exact, case-insensitive), e.g. 'IV'. "
+            "Applied after the fetch"
+        ),
+    ),
+]
+StationFilter = Annotated[
+    Optional[str],
+    Field(
+        max_length=8,
+        description=(
+            "Filter rows by station code (exact, case-insensitive), e.g. 'SGRT'. "
+            "Applied after the fetch"
+        ),
+    ),
+]
+MagnitudeTypeFilter = Annotated[
+    Optional[str],
+    Field(
+        max_length=16,
+        description=(
+            "Filter rows by station magnitude type (exact, case-insensitive), "
+            "e.g. 'ML'. Useful where an origin carries more than one magnitude"
+        ),
+    ),
+]
+RowOffset = Annotated[
+    int,
+    Field(
+        ge=1,
+        description=(
+            "1-based index of the first row to return (default: 1). Page with "
+            "the next_offset the previous response suggests"
+        ),
+    ),
+]
+
+
+EventsLimit = Annotated[
+    int,
+    Field(
+        ge=1,
+        le=config.MAX_ROWS_EVENTS,
+        description=(
+            "Maximum number of events to return "
+            f"(default: {config.DEFAULT_ROWS_EVENTS}, max: {config.MAX_ROWS_EVENTS})"
+        ),
+    ),
+]
 
 
 class QueryEarthquakesInput(BaseModel):
@@ -82,105 +271,25 @@ class QueryEarthquakesInput(BaseModel):
         extra="forbid",
     )
 
-    starttime: Optional[str] = Field(
-        default=None,
-        description="Start time in YYYY-MM-DDTHH:MM:SS format (default: today 00:00:00)",
-    )
-    endtime: Optional[str] = Field(
-        default=None,
-        description="End time in YYYY-MM-DDTHH:MM:SS format (default: today 23:59:59)",
-    )
-    updatedafter: Optional[str] = Field(
-        default=None,
-        description="Return events updated after this time (ISO 8601: YYYY-MM-DDTHH:MM:SS)",
-    )
-    minmag: Optional[float] = Field(
-        default=None,
-        ge=-2.0,
-        le=10.0,
-        description="Minimum magnitude (e.g., 4.0 for significant events)",
-    )
-    maxmag: Optional[float] = Field(
-        default=None, ge=-2.0, le=10.0, description="Maximum magnitude"
-    )
-    minlat: Optional[float] = Field(
-        default=None,
-        ge=-90.0,
-        le=90.0,
-        description="Minimum latitude (WGS84) - for geographic filtering",
-    )
-    maxlat: Optional[float] = Field(
-        default=None,
-        ge=-90.0,
-        le=90.0,
-        description="Maximum latitude (WGS84) - for geographic filtering",
-    )
-    minlon: Optional[float] = Field(
-        default=None,
-        ge=-180.0,
-        le=180.0,
-        description="Minimum longitude (WGS84) - for geographic filtering",
-    )
-    maxlon: Optional[float] = Field(
-        default=None,
-        ge=-180.0,
-        le=180.0,
-        description="Maximum longitude (WGS84) - for geographic filtering",
-    )
-    mindepth: Optional[float] = Field(
-        default=None, ge=0.0, description="Minimum depth in kilometers"
-    )
-    maxdepth: Optional[float] = Field(
-        default=None, ge=0.0, description="Maximum depth in kilometers"
-    )
-    latitude: Optional[float] = Field(
-        default=None, ge=-90.0, le=90.0,
-        description="Center latitude for radial search (WGS84)",
-    )
-    longitude: Optional[float] = Field(
-        default=None, ge=-180.0, le=180.0,
-        description="Center longitude for radial search (WGS84)",
-    )
-    minradiuskm: Optional[float] = Field(
-        default=None, ge=0.0,
-        description="Minimum radius in km for radial search",
-    )
-    maxradiuskm: Optional[float] = Field(
-        default=None, ge=0.0,
-        description="Maximum radius in km for radial search",
-    )
-    limit: int = Field(
-        default=config.DEFAULT_ROWS_EVENTS,
-        ge=1,
-        le=config.MAX_ROWS_EVENTS,
-        description=(
-            "Maximum number of events to return "
-            f"(default: {config.DEFAULT_ROWS_EVENTS}, max: {config.MAX_ROWS_EVENTS})"
-        ),
-    )
-    offset: int = Field(
-        default=1,
-        ge=1,
-        description=(
-            "1-based index of the first event to return, per the FDSN spec "
-            "(default: 1). Use with limit to page: next_offset = offset + returned_count. "
-            "Note: offset indexing follows the datacenter implementation."
-        ),
-    )
-    orderby: Literal["time", "time-asc", "magnitude", "magnitude-asc"] = Field(
-        default="time",
-        description=(
-            "Sort order of results: time (most recent first, default), time-asc, "
-            "magnitude (largest first), magnitude-asc"
-        ),
-    )
-    datacenter: str = Field(
-        default="INGV",
-        description=(
-            "FDSN datacenter to query (e.g., INGV, EMSC, GFZ, USGS). "
-            "Default INGV is an overridable convenience, not a binding"
-        ),
-    )
+    starttime: StartTime = None
+    endtime: EndTime = None
+    updatedafter: UpdatedAfter = None
+    minmag: MinMag = None
+    maxmag: MaxMag = None
+    minlat: MinLat = None
+    maxlat: MaxLat = None
+    minlon: MinLon = None
+    maxlon: MaxLon = None
+    mindepth: MinDepth = None
+    maxdepth: MaxDepth = None
+    latitude: Latitude = None
+    longitude: Longitude = None
+    minradiuskm: MinRadiusKm = None
+    maxradiuskm: MaxRadiusKm = None
+    limit: EventsLimit = config.DEFAULT_ROWS_EVENTS
+    offset: EventsOffset = 1
+    orderby: OrderBy = "time"
+    datacenter: DataCenter = "INGV"
 
     @field_validator("starttime", "endtime", "updatedafter", mode="before")
     @classmethod
@@ -233,9 +342,6 @@ class QueryEarthquakesInput(BaseModel):
 # called `_by_originid` invites a model to invent an origin id. That is the
 # failure the opaque-string typing of `eventid` exists to prevent.
 
-_DATACENTER_FIELD_DESCRIPTION = "FDSN datacenter to query (e.g., INGV, EMSC, GFZ, USGS)"
-
-
 class _ByEventIdInput(BaseModel):
     """Shared shape of every by-event-id tool input."""
 
@@ -245,10 +351,7 @@ class _ByEventIdInput(BaseModel):
     )
 
     eventid: EventId
-    datacenter: str = Field(
-        default="INGV",
-        description=_DATACENTER_FIELD_DESCRIPTION,
-    )
+    datacenter: DataCenter = "INGV"
 
 
 class _TabularByEventIdInput(_ByEventIdInput):
@@ -260,30 +363,9 @@ class _TabularByEventIdInput(_ByEventIdInput):
     through every reading of the event.
     """
 
-    network: Optional[str] = Field(
-        default=None,
-        max_length=8,
-        description=(
-            "Filter rows by network code (exact, case-insensitive), e.g. 'IV'. "
-            "Applied after the fetch"
-        ),
-    )
-    station: Optional[str] = Field(
-        default=None,
-        max_length=8,
-        description=(
-            "Filter rows by station code (exact, case-insensitive), e.g. 'SGRT'. "
-            "Applied after the fetch"
-        ),
-    )
-    offset: int = Field(
-        default=1,
-        ge=1,
-        description=(
-            "1-based index of the first row to return (default: 1). Page with "
-            "next_offset from the previous response"
-        ),
-    )
+    network: NetworkFilter = None
+    station: StationFilter = None
+    offset: RowOffset = 1
 
 
 class GetEarthquakeByEventIdInput(_ByEventIdInput):
@@ -315,14 +397,7 @@ class GetArrivalsByEventIdInput(_TabularByEventIdInput):
 
 
 class GetStationMagnitudesByEventIdInput(_TabularByEventIdInput):
-    magnitude_type: Optional[str] = Field(
-        default=None,
-        max_length=16,
-        description=(
-            "Filter rows by station magnitude type (exact, case-insensitive), "
-            "e.g. 'ML'. Useful where an origin carries more than one magnitude"
-        ),
-    )
+    magnitude_type: MagnitudeTypeFilter = None
     limit: int = Field(
         default=config.DEFAULT_ROWS_STATIONMAGNITUDES,
         ge=1,
