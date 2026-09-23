@@ -99,6 +99,54 @@ smaller ones would drop the only fixtures that exercise large nested payloads. X
 this repetitive compresses about thirtyfold, so the four INGV documents cost ~260 kB
 of history despite occupying ~8 MB in a checkout.
 
+## A/B harnesses (`ab/`)
+
+Live experiments against a model behind OpenWebUI. Not collected by pytest; they
+need `OPENWEBUI_API_KEY` and network access. `eventid_hallucination_ab.py` is the
+artifact behind published numbers and is not modified.
+
+`identity_continuity_ab.py` measures whether, after a `fdsn_query_earthquakes`
+result from GFZ or EMSC, the model calls `fdsn_get_earthquake_by_eventid` with
+both the right `eventid` **and** the right `datacenter`: omitting `datacenter`
+silently queries INGV. The query results are rebuilt from the Honshu fixtures by
+the server's own parser; the `baseline` arm offers the deployed tool (description
+and schema read from the server), the `bound` arm adds one sentence,
+`BINDING_NOTE`, binding the id to the datacenter that returned it. No user turn
+names a datacenter or an id: both appear only in the replayed tool-call arguments
+and tool results. The idea and
+the scoring classes come from PR #1 by @joy7758.
+
+| Scenario | Replayed history | Expected call |
+|---|---|---|
+| A | one GFZ query | `GFZ`, `gfz2024aati` |
+| B | one EMSC query | `EMSC`, `20240101_0000127` |
+| C | GFZ query, then EMSC query; asks for the second | `EMSC`, `20240101_0000127` |
+| D | one failed GFZ query | no detail call |
+
+The deployed `fdsn_query_earthquakes` is offered too, identical in both arms. In
+A-C calling it is `UNEXPECTED_TOOL_CALL` (the result is already in context); in D a
+re-query with no detail call is `CORRECT`, and any detail call is
+`UNEXPECTED_TOOL_CALL`. Datacenters are compared as the server routes them, so
+`GEOFON` and `GFZ` match; argument keys the tool does not define are ignored, as
+the server ignores them, and listed in the attempt's `extra_args`.
+
+The harness imports `fdsnws_event_server`, so run it from the project venv or
+after `pip install -e .`.
+
+```bash
+export OPENWEBUI_API_KEY=sk-...
+python tests/ab/identity_continuity_ab.py --base-url http://host:8586 \
+    --model qwen2.5:72b-instruct --repeat 10 --variant both > run.jsonl
+```
+
+Output is JSON Lines: a `config` record, one `attempt` record per call (status and
+raw assistant message), and a `summary` per scenario and arm with the eight class
+counts and `correct_rate` (HTTP errors excluded from the denominator). The
+production wording in `src/` changes only after a live run shows `bound` helps.
+`unit/test_identity_continuity_ab.py` checks the scorer offline, and that the
+replayed query results are byte-identical to what `fdsn_query_earthquakes` returns
+for the same fixtures.
+
 ## Conventions
 
 - Unit tests must not touch the network — mock `requests.get` (see
