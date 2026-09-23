@@ -12,7 +12,30 @@ from pydantic import Field, ValidationError
 
 from . import config, tables
 from .models import (
+    DataCenter,
+    EndTime,
     EventIdInput,
+    EventsLimit,
+    EventsOffset,
+    Latitude,
+    Longitude,
+    MagnitudeTypeFilter,
+    MaxDepth,
+    MaxLat,
+    MaxLon,
+    MaxMag,
+    MaxRadiusKm,
+    MinDepth,
+    MinLat,
+    MinLon,
+    MinMag,
+    MinRadiusKm,
+    NetworkFilter,
+    OrderBy,
+    RowOffset,
+    StartTime,
+    StationFilter,
+    UpdatedAfter,
     GetAllMagnitudesByEventIdInput,
     GetAllOriginsByEventIdInput,
     GetAmplitudesByEventIdInput,
@@ -58,22 +81,13 @@ _EVENTID_NOTE = (
     "reformat, or use placeholder values.\n\n"
 )
 
-# FastMCP derives each tool's JSON schema from the *function signature*, not from
-# the Pydantic input model validated inside the body. A bare `limit: int = 150`
-# therefore publishes no maximum at all, and the model -- told nothing -- asks
-# for 1000 and gets a ValueError it cannot learn from. These annotated aliases
-# put the bounds where tools/list can see them, so the limit is advertised and
-# refused by the protocol layer rather than discovered by trial.
-Offset = Annotated[
-    int,
-    Field(
-        ge=1,
-        description=(
-            "1-based index of the first row to return (default: 1). Page with the "
-            "next_offset the previous response suggests"
-        ),
-    ),
-]
+# FastMCP derives each tool's JSON schema from the *function signature*, not
+# from the Pydantic model validated inside the body, so every parameter below is
+# annotated with the type declared once in `models`. A bare `limit: int` or
+# `eventid: Union[int, str]` publishes no bound, no pattern and no description:
+# the model is told nothing, asks for something the server refuses, and learns
+# only from the error. The row limits additionally depend on `config`, so they
+# are built here where both are in scope.
 
 
 def _limit_field(default: int, maximum: int, what: str):
@@ -103,33 +117,6 @@ StationMagnitudesLimit = _limit_field(
 AmplitudesLimit = _limit_field(
     config.DEFAULT_ROWS_AMPLITUDES, config.MAX_ROWS_AMPLITUDES, "amplitude rows"
 )
-EventsLimit = _limit_field(
-    config.DEFAULT_ROWS_EVENTS, config.MAX_ROWS_EVENTS, "events"
-)
-
-StationFilter = Annotated[
-    Optional[str],
-    Field(
-        default=None,
-        max_length=8,
-        description=(
-            "Filter rows by station code (exact, case-insensitive), e.g. 'SGRT'. "
-            "Applied after the fetch"
-        ),
-    ),
-]
-
-NetworkFilter = Annotated[
-    Optional[str],
-    Field(
-        default=None,
-        max_length=8,
-        description=(
-            "Filter rows by network code (exact, case-insensitive), e.g. 'IV'. "
-            "Applied after the fetch"
-        ),
-    ),
-]
 
 _TABLE_NOTE = (
     "Returns a table: 'columns' names the fields once and 'rows' carries one list "
@@ -372,25 +359,25 @@ def _table_response(
     annotations=_QUERY_ANNOTATIONS,
 )
 async def fdsn_query_earthquakes(
-    starttime: Optional[str] = None,
-    endtime: Optional[str] = None,
-    updatedafter: Optional[str] = None,
-    minmag: Optional[float] = None,
-    maxmag: Optional[float] = None,
-    minlat: Optional[float] = None,
-    maxlat: Optional[float] = None,
-    minlon: Optional[float] = None,
-    maxlon: Optional[float] = None,
-    mindepth: Optional[float] = None,
-    maxdepth: Optional[float] = None,
-    latitude: Optional[float] = None,
-    longitude: Optional[float] = None,
-    minradiuskm: Optional[float] = None,
-    maxradiuskm: Optional[float] = None,
+    starttime: StartTime = None,
+    endtime: EndTime = None,
+    updatedafter: UpdatedAfter = None,
+    minmag: MinMag = None,
+    maxmag: MaxMag = None,
+    minlat: MinLat = None,
+    maxlat: MaxLat = None,
+    minlon: MinLon = None,
+    maxlon: MaxLon = None,
+    mindepth: MinDepth = None,
+    maxdepth: MaxDepth = None,
+    latitude: Latitude = None,
+    longitude: Longitude = None,
+    minradiuskm: MinRadiusKm = None,
+    maxradiuskm: MaxRadiusKm = None,
     limit: EventsLimit = config.DEFAULT_ROWS_EVENTS,
-    offset: Offset = 1,
-    orderby: str = "time",
-    datacenter: str = "INGV",
+    offset: EventsOffset = 1,
+    orderby: OrderBy = "time",
+    datacenter: DataCenter = "INGV",
 ) -> str:
     try:
         params = QueryEarthquakesInput(
@@ -532,7 +519,7 @@ async def fdsn_query_earthquakes(
     annotations=_QUERY_ANNOTATIONS,
 )
 async def fdsn_get_earthquake_by_eventid(
-    eventid: EventIdInput, datacenter: str = "INGV"
+    eventid: EventIdInput, datacenter: DataCenter = "INGV"
 ) -> str:
     try:
         params = GetEarthquakeByEventIdInput(eventid=eventid, datacenter=datacenter)
@@ -606,7 +593,7 @@ async def fdsn_get_earthquake_by_eventid(
     annotations=_QUERY_ANNOTATIONS,
 )
 async def fdsn_get_allorigins_by_eventid(
-    eventid: EventIdInput, datacenter: str = "INGV"
+    eventid: EventIdInput, datacenter: DataCenter = "INGV"
 ) -> str:
     try:
         params = GetAllOriginsByEventIdInput(eventid=eventid, datacenter=datacenter)
@@ -656,7 +643,7 @@ async def fdsn_get_allorigins_by_eventid(
     annotations=_QUERY_ANNOTATIONS,
 )
 async def fdsn_get_allmagnitudes_by_eventid(
-    eventid: EventIdInput, datacenter: str = "INGV"
+    eventid: EventIdInput, datacenter: DataCenter = "INGV"
 ) -> str:
     try:
         params = GetAllMagnitudesByEventIdInput(eventid=eventid, datacenter=datacenter)
@@ -705,7 +692,7 @@ async def fdsn_get_allmagnitudes_by_eventid(
     annotations=_QUERY_ANNOTATIONS,
 )
 async def fdsn_get_focalmechanism_by_eventid(
-    eventid: EventIdInput, datacenter: str = "INGV"
+    eventid: EventIdInput, datacenter: DataCenter = "INGV"
 ) -> str:
     try:
         params = GetFocalMechanismByEventIdInput(eventid=eventid, datacenter=datacenter)
@@ -769,11 +756,11 @@ async def fdsn_get_focalmechanism_by_eventid(
 )
 async def fdsn_get_arrivals_by_eventid(
     eventid: EventIdInput,
-    datacenter: str = "INGV",
+    datacenter: DataCenter = "INGV",
     network: NetworkFilter = None,
     station: StationFilter = None,
     limit: ArrivalsLimit = config.DEFAULT_ROWS_ARRIVALS,
-    offset: Offset = 1,
+    offset: RowOffset = 1,
 ) -> str:
     try:
         params = GetArrivalsByEventIdInput(
@@ -831,12 +818,12 @@ async def fdsn_get_arrivals_by_eventid(
 )
 async def fdsn_get_stationmagnitudes_by_eventid(
     eventid: EventIdInput,
-    datacenter: str = "INGV",
+    datacenter: DataCenter = "INGV",
     network: NetworkFilter = None,
     station: StationFilter = None,
-    magnitude_type: Annotated[Optional[str], Field(default=None, max_length=16, description="Filter rows by station magnitude type (exact, case-insensitive), e.g. 'ML'. Useful where an origin carries more than one magnitude")] = None,
+    magnitude_type: MagnitudeTypeFilter = None,
     limit: StationMagnitudesLimit = config.DEFAULT_ROWS_STATIONMAGNITUDES,
-    offset: Offset = 1,
+    offset: RowOffset = 1,
 ) -> str:
     try:
         params = GetStationMagnitudesByEventIdInput(
@@ -902,11 +889,11 @@ async def fdsn_get_stationmagnitudes_by_eventid(
 )
 async def fdsn_get_amplitudes_by_eventid(
     eventid: EventIdInput,
-    datacenter: str = "INGV",
+    datacenter: DataCenter = "INGV",
     network: NetworkFilter = None,
     station: StationFilter = None,
     limit: AmplitudesLimit = config.DEFAULT_ROWS_AMPLITUDES,
-    offset: Offset = 1,
+    offset: RowOffset = 1,
 ) -> str:
     try:
         params = GetAmplitudesByEventIdInput(
